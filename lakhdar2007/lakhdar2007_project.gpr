@@ -1,0 +1,17 @@
+[PROJECT]
+
+[RP:EPSCM]
+1=
+
+[RP:SINGLE_OBJECTIVE]
+1=
+
+[OPENWINDOW_1]
+FILE0=C:\Users\Karolis\Google Drive\GAMS\MILP-Models\lakhdar2007\single_objective.gms
+FILE1=C:\Users\Karolis\Google Drive\GAMS\MILP-Models\lakhdar2007\single_objective.lst
+FILE2=C:\Users\Karolis\Google Drive\GAMS\MILP-Models\lakhdar2007\single_objective.lst
+MAXIM=0
+TOP=0
+LEFT=0
+HEIGHT=756
+WIDTH=798
