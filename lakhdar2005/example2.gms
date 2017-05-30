@@ -108,7 +108,7 @@ $offtext
 
 VARIABLE
 *                PROFIT
-                 profit          profit
+                 profit
                  Sold
                  TC
                  PC
@@ -172,7 +172,7 @@ UpstreamProduction(map(i, p), t)..               CP(i, p, t)     =E=     Z(i, p,
 *                        OR
 *                        UpstreamProduction(i, p, t)$map(i, p)
 * the constraint will not be evaluated unless the conditional is true
-DownstreamProduction(j, p, t)..                  FP(j, p, t)     =E=     X(j, p, t) + FR(p) * ( FT(j, p, t) - beta(p) * X(j, p, t) );
+DownstreamProduction(j, p, t)..                  FP(j, p, t)     =E=     W(j, p, t) + FR(p) * ( FT(j, p, t) - beta(p) * W(j, p, t) );
 Zfunction(map(i, p), t)..                        Z(i, p, t)      =G=     Y(i, p, t) - Y(i, p, t - 1);
 Xfunction(j, p, t)..                             X(j, p, t)      =G=     U(j, p, t) - U(j, p, t - 1);
 Wfunction(j, p, t)..                             W(j, p, t)      =G=     SUM(i, Z(i, p, t)$map(i, p))/card(i) + X(j, p, t) - 1;
