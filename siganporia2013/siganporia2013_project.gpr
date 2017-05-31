@@ -1,0 +1,35 @@
+[PROJECT]
+
+[RP:CYRUSPAPER1_KAROLIS_DEBUG2]
+1=
+
+[RP:SUBSET_SUM]
+1=
+
+[RP:CYRUSPAPER1_KAROLIS_DEBUG]
+1=
+
+[RP:SINGLE_OBJECTIVE]
+1=
+
+[RP:MODEL]
+1=
+
+[MRUFILES]
+1=E:\Google Drive\GAMS\MILP-Models\lakhdar2007\single_objective.gms
+2=E:\Google Drive\GAMS\MILP-Models\siganporia2013\CyrusPaper1_Karolis_Debug.lst
+3=E:\Google Drive\GAMS\MILP-Models\siganporia2013\CyrusPaper1_Karolis_Debug2.lst
+4=E:\Google Drive\GAMS\projdir\Cyrus 2013 paper model\CyrusPaper1_Karolis_Debug.gms
+5=E:\Google Drive\GAMS\projdir\Cyrus 2013 paper model\subset_sum.gms
+6=E:\Google Drive\GAMS\projdir\Cyrus 2013 paper model\CyrusPaper1_Karolis_Debug2.gms
+7=E:\Google Drive\GAMS\MILP-Models\siganporia2013\subset_sum.lst
+
+[OPENWINDOW_1]
+FILE0=E:\Google Drive\GAMS\MILP-Models\siganporia2013\model.gms
+FILE1=E:\Google Drive\GAMS\MILP-Models\siganporia2013\model.lst
+FILE2=E:\Google Drive\GAMS\MILP-Models\siganporia2013\model.lst
+MAXIM=0
+TOP=0
+LEFT=0
+HEIGHT=936
+WIDTH=958
