@@ -14,7 +14,7 @@ EQUATIONS
 
 Objective..      obj =E= sum(i, indices(i) * nums(i));
 Cons1..          sum(i, indices(i)) =E= 3;
-Cons2..          obj =E= 9;
+Cons2..          obj =L= 9;
 
 MODEL    subset_sum /Objective, Cons2, Cons1/;
 

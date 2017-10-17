@@ -1,1 +1,13 @@
 [PROJECT]
+
+[RP:KNAPSACK]
+1=
+
+[OPENWINDOW_1]
+FILE0=E:\Google Drive\GAMS\MILP-Models\subset_sum\subset_sum.gms
+FILE1=E:\Google Drive\GAMS\MILP-Models\subset_sum\subset_sum.gms
+MAXIM=1
+TOP=0
+LEFT=0
+HEIGHT=936
+WIDTH=958

@@ -8,9 +8,8 @@
 
 [OPENWINDOW_1]
 FILE0=C:\Users\Karolis\Google Drive\GAMS\MILP-Models\lakhdar2007\single_objective.gms
-FILE1=C:\Users\Karolis\Google Drive\GAMS\MILP-Models\lakhdar2007\single_objective.lst
-FILE2=C:\Users\Karolis\Google Drive\GAMS\MILP-Models\lakhdar2007\single_objective.lst
-MAXIM=0
+FILE1=C:\Users\Karolis\Google Drive\GAMS\MILP-Models\lakhdar2007\single_objective.gms
+MAXIM=1
 TOP=0
 LEFT=0
 HEIGHT=756

@@ -1,1 +1,13 @@
 [PROJECT]
+
+[RP:SUBSET_SUM]
+1=
+
+[OPENWINDOW_1]
+FILE0=E:\Google Drive\GAMS\MILP-Models\lakhdar2005\example1.gms
+FILE1=E:\Google Drive\GAMS\MILP-Models\lakhdar2005\example1.gms
+MAXIM=1
+TOP=26
+LEFT=26
+HEIGHT=624
+WIDTH=1604
