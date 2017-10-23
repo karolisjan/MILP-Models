@@ -4,8 +4,10 @@ Implementations of various mixed-integer linear programming ([MILP](https://en.w
 
 ## General Algebraic Modeling System (GAMS)
 
-The models have been implemented using GAMS v23.9.5.
+The models have been implemented using both [GAMS](https://www.gams.com/products/introduction/) v23.9.5 and [Julia](https://julialang.org/) programming language (with [JuMP](http://www.juliaopt.org/) optimisation package).
 
-[GAMS](https://www.gams.com/products/introduction/) is a high-level modeling system for mathematical programming and optimization. It consists of a language compiler and a stable of integrated high-performance solvers. 
+[Here](lakhdar2005/example1.ipynb) is a complete example of a capacity planning MILP model solved using Julia. 
+
+
 
 
