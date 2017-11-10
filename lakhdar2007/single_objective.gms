@@ -3,10 +3,10 @@ SETS     i               USP suites
          p               products
                          /p1*p15/
          t               time periods
-                         /t1*t60/
+                         /t1*t4/
          PI(i, p)        set of products produced by i
          TI(i, t)        set of time periods in which i is available for use
-                         /i1*i10.t1*t60/;
+                         /i1*i10.t1*t4/;
 
 *        facility i6 unavailable until t5
          TI(i, t)$(ord(i)=6 and ord(t)<5) = no;
@@ -112,11 +112,28 @@ Backlog(p, tt)..                                 delta(p, tt) =E= pie*delta(p, t
 
 MODEL                    single_objective /All/;
 
-                         option optcr = 0.01;
+                         option optcr = 0.0;
                          option reslim = 50000;
                          option threads = 4;
 
 delta.fx(p,t)$(ord(t)>0) = 0;
+
+$ontext 
+B.fx(i,p,t)$(ord(i)=1 and ord(p)=9 and ord(t)=1) = 9;
+B.fx(i,p,t)$(ord(i)=1 and ord(p)=10 and ord(t)=2) = 9;
+B.fx(i,p,t)$(ord(i)=1 and ord(p)=1 and ord(t)=3) = 4;
+B.fx(i,p,t)$(ord(i)=1 and ord(p)=6 and ord(t)=4) = 7;
+
+B.fx(i,p,t)$(ord(i)=2 and ord(p)=4 and ord(t)=1) = 25;
+B.fx(i,p,t)$(ord(i)=2 and ord(p)=11 and ord(t)=2) = 22;
+B.fx(i,p,t)$(ord(i)=2 and ord(p)=11 and ord(t)=3) = 34;
+B.fx(i,p,t)$(ord(i)=2 and ord(p)=6 and ord(t)=4) = 29;
+
+B.fx(i,p,t)$(ord(i)=3 and ord(p)=13 and ord(t)=1) = 15;
+B.fx(i,p,t)$(ord(i)=3 and ord(p)=13 and ord(t)=2) = 4;
+B.fx(i,p,t)$(ord(i)=3 and ord(p)=13 and ord(t)=3) = 5;
+B.fx(i,p,t)$(ord(i)=3 and ord(t)=4) = 0;
+$offtext
 
 SOLVE                    single_objective USING MIP MAXIMIZING profit;
 
@@ -147,6 +164,9 @@ display K.l;
 display S.l;
 display B.l;
 display Storage.l, S.l, delta.l, Time.l, TotalProduced;
+display Z.l;
+display Y.l;
+display Time.l;
 
 
 

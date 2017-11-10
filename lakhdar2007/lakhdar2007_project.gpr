@@ -3,14 +3,42 @@
 [RP:EPSCM]
 1=
 
+[GDXDISP: Demand Par 2]
+PlaneDim=0
+RowDim=2
+Squeeze=1
+Order=1,2
+Decim=7
+PlaneRownr=-1
+
+[GDXDISP: yd Par 2]
+PlaneDim=0
+RowDim=2
+Squeeze=1
+Order=1,2
+Decim=7
+PlaneRownr=-1
+
+[RP:MODEL]
+1=
+
+[RP:EXAMPLE1]
+1=
+
 [RP:SINGLE_OBJECTIVE]
 1=
 
+[MRUFILES]
+1=E:\MILP-Models\lakhdar2005\example1.gms
+2=E:\MILP-Models\siganporia2013\model.gms
+3=E:\MILP-Models\lakhdar2007\input.gdx
+
 [OPENWINDOW_1]
-FILE0=C:\Users\Karolis\Google Drive\GAMS\MILP-Models\lakhdar2007\single_objective.gms
-FILE1=C:\Users\Karolis\Google Drive\GAMS\MILP-Models\lakhdar2007\single_objective.gms
+FILE0=E:\MILP-Models\lakhdar2007\single_objective.gms
+FILE1=E:\MILP-Models\lakhdar2007\single_objective.lst
+FILE2=E:\MILP-Models\lakhdar2007\single_objective.gms
 MAXIM=1
 TOP=0
 LEFT=0
-HEIGHT=756
-WIDTH=798
+HEIGHT=936
+WIDTH=958
