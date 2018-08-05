@@ -1,0 +1,130 @@
+
+--- Job example1.gms Start 07/26/18 15:29:06 WEX-WEI 23.9.5 x86_64/MS Windows     
+GAMS Rev 239  Copyright (C) 1987-2012 GAMS Development. All rights reserved
+Licensee: Dept. Biochemical Engineering                  S120223:1043AN-WIN
+          University College London                                  DC9439
+          License for teaching and research at degree granting institutions
+--- Starting compilation
+--- example1.gms(212) 3 Mb
+--- Starting execution: elapsed 0:00:00.005
+--- example1.gms(203) 4 Mb
+--- Generating MIP model lakhdar2005example1
+--- example1.gms(205) 4 Mb
+---   542 rows  464 columns  1,764 non-zeroes
+---   252 discrete-columns
+***
+***   72 Integer +INF Bounds have been reset to 100
+***
+--- Executing CPLEX: elapsed 0:00:00.071
+
+IBM ILOG CPLEX   Jul  4, 2012 23.9.5 WEX 36376.36401 WEI x86_64/MS Windows
+--- GAMS/Cplex licensed for continuous and discrete problems.
+Cplex 12.4.0.1
+
+Reading data...
+Starting Cplex...
+Tried aggregator 2 times.
+MIP Presolve eliminated 82 rows and 52 columns.
+MIP Presolve modified 98 coefficients.
+Aggregator did 25 substitutions.
+Reduced MIP has 435 rows, 387 columns, and 1329 nonzeros.
+Reduced MIP has 172 binaries, 72 generals, 0 SOSs, and 0 indicators.
+Probing fixed 0 vars, tightened 18 bounds.
+Probing time =    0.00 sec.
+Tried aggregator 1 time.
+MIP Presolve eliminated 4 rows and 4 columns.
+MIP Presolve modified 40 coefficients.
+Reduced MIP has 431 rows, 383 columns, and 1321 nonzeros.
+Reduced MIP has 168 binaries, 108 generals, 0 SOSs, and 0 indicators.
+Presolve time =    0.02 sec.
+Found feasible solution after 0.02 sec.  Objective = -2080.0000
+Probing time =    0.00 sec.
+Clique table members: 264.
+MIP emphasis: balance optimality and feasibility.
+MIP search method: dynamic search.
+Parallel mode: deterministic, using up to 4 threads.
+Tried aggregator 1 time.
+LP Presolve eliminated 12 rows and 0 columns.
+Aggregator did 10 substitutions.
+Reduced LP has 409 rows, 373 columns, and 1275 nonzeros.
+Presolve time =    0.00 sec.
+Initializing dual steep norms . . .
+
+Iteration log . . .
+Iteration:     1   Dual objective     =           800.000000
+Iteration:    75   Dual objective     =           532.228571
+Iteration:   137   Dual objective     =           526.068736
+Initializing dual steep norms . . .
+Root relaxation solution time =    0.00 sec.
+
+        Nodes                                         Cuts/
+   Node  Left     Objective  IInf  Best Integer    Best Bound    ItCnt     Gap
+
+*     0+    0                        -2080.0000                    171     --- 
+      0     0      524.8069   117    -2080.0000      524.8069      171  125.23%
+      0     0      518.1610   124    -2080.0000      Cuts: 91      271  124.91%
+      0     0      517.3880   134    -2080.0000      Cuts: 41      314  124.87%
+      0     0      517.1596   142    -2080.0000      Cuts: 32      344  124.86%
+      0     0      517.1133   138    -2080.0000       Cuts: 8      354  124.86%
+      0     0      516.8898    91    -2080.0000      Cuts: 12      412  124.85%
+      0     0      516.8898    90    -2080.0000      Cuts: 13      414  124.85%
+      0     0      516.8898    92    -2080.0000       Cuts: 2      417  124.85%
+*     0+    0                          156.0000      516.8898      417  231.34%
+      0     2      516.8898    88      156.0000      516.8898      417  231.34%
+Elapsed real time =   0.17 sec. (tree size =  0.01 MB, solutions = 2)
+*   101+   79                          363.0000      516.8490     2254   42.38%
+*   151    62      integral     0      472.0000      501.4523     3165    6.24%
+                                                  Impl Bds: 1                  
+*   227    52      integral     0      488.0000      501.4523     4284    2.76%
+                                                  Impl Bds: 2                  
+*   568   116      integral     0      489.0000      495.7209     7625    1.37%
+                                                     Cuts: 51                  
+*   733    31      integral     0      490.0000      492.2500     9055    0.46%
+                                                     Cuts: 14                  
+
+GUB cover cuts applied:  4
+Cover cuts applied:  20
+Implied bound cuts applied:  57
+Flow cuts applied:  18
+Mixed integer rounding cuts applied:  18
+Zero-half cuts applied:  10
+Gomory fractional cuts applied:  7
+
+Root node processing (before b&c):
+  Real time             =    0.16
+Parallel b&c, 4 threads:
+  Real time             =    0.20
+  Sync time (average)   =    0.00
+  Wait time (average)   =    0.00
+                          -------
+Total (root+branch&cut) =    0.36 sec.
+MIP status(101): integer optimal solution
+Fixing integer variables, and solving final LP...
+Tried aggregator 1 time.
+LP Presolve eliminated 499 rows and 410 columns.
+Aggregator did 16 substitutions.
+Reduced LP has 27 rows, 38 columns, and 100 nonzeros.
+Presolve time =    0.05 sec.
+Initializing dual steep norms . . .
+
+Iteration log . . .
+Iteration:     1   Dual infeasibility =            39.000000
+Iteration:     5   Dual objective     =          1920.000000
+Fixed MIP status(1): optimal
+
+Proven optimal solution.
+
+MIP Solution:          490.000000    (9135 iterations, 766 nodes)
+Final Solve:           490.000000    (11 iterations)
+
+Best possible:         490.000000
+Absolute gap:            0.000000
+Relative gap:            0.000000
+
+--- Restarting execution
+--- example1.gms(205) 2 Mb
+--- Reading solution for model lakhdar2005example1
+--- Executing after solve: elapsed 0:00:00.603
+--- example1.gms(207) 3 Mb
+*** Status: Normal completion
+--- Job example1.gms Stop 07/26/18 15:29:06 elapsed 0:00:00.616

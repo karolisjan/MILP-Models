@@ -1,0 +1,4019 @@
+GAMS Rev 239  WEX-WEI 23.9.5 x86_64/MS Windows          08/05/18 20:56:27 Page 1
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+C o m p i l a t i o n
+
+
+   1  SETs     i               USP suites
+   2                           /i1*i2/
+   3           j               DSP suites
+   4                           /j1*j3/
+   5           p               products
+   6                           /p1*p4/
+   7           t               time periods
+   8                           /t1*t9/
+   9           map(i, p)       /i1*i2.p1*p4/
+  10   
+  11  ALIAS(t, tt);
+  12   
+  13  PARAMETERs
+                       parameter data for upstream production i
+  17                   CR(p)           production rate [batches a day]
+  18                                   /p1 .05, p2 .045, p3 .08, p4 .08/
+  19                   alpha(p)        lead time [days]
+  20                                   /p1 30, p2 32, p3 22.5, p4 22.5/
+  21                   zeta(p)         product lifetime [time periods]
+  22                                   /p1*p4 1/
+  23                   C(p)            storage capacity [batch a time period]
+  24                                   /p1*p4 10/
+  25                   CTmin(p)        min campaign length [days]
+  26                                   /p1 20, p2 21, p3 12.5, p4 12.5/
+  27                   CTmax(p)        max capaign length [days]
+  28                                   /p1*p4 60/
+  29                   rho(p)          storage cost [rmu a batch]
+  30                                   /p1*p4 5/
+  31                   nu(p)           sales price [rmu a batch]
+  32                                   /p1 25, p2 20, p3 17, p4 17/
+  33                   eta(p)          mfg cost [rmu a batch]
+  34                                   /p1 5, p2 2, p3 1, p4 1/
+  35                   tau(p)          waste disposal cost [rmu a batch]
+  36                                   /p1*p4 5/
+                       parameter data for downstream production j
+  40                   FR(p)           production rate [batches a day]
+  41                                   /p1*p4 .1/
+  42                   beta(p)         lead time [days]
+  43                                   /p1 40, p2 42, p3 44.5, p4 44.5/
+  44                   sigma(p)        product lifetime [time periods]
+  45                                   /p1*p4 3/
+  46                   F(p)            storage capacity [batch a time period]
+  47                                   /p1*p4 40/
+  48                   FTmin(p)        min campaign length [days]
+  49                                   /p1*p4 10/
+  50                   FTmax(p)        max campaign length [days]
+  51                                   /p1*p4 60/
+  52                   omega(p)        storage cost [rmu a batch]
+  53                                   /p1*p4 1/
+  54                   d(p)            lateness penalty [rmu a batch]
+  55                                   /p1*p4 20/
+  56                   psi(p)          changeover cost [rmu a batch]
+  57                                   /p1*p4 1/
+  58                   lambda(p)       production factor
+  59                                   /p1 1, p2 1, p3 1, p4 1/;
+  60   
+  61  TABLE            Demand(p, t)         demand profile [number of batches]
+  62                   t1      t2      t3      t4      t5      t6      t7      t
+      8      t9
+  63           p1                               6               4               
+              4
+  64           p2               4                                       4
+  65           p3                                      10                       
+             10
+  66           p4               6               8;
+  67   
+  68  SCALAR           H               production time horizon
+  69                                   /60/;
+  70   
+  71  BINARY VARIABLEs Z(i, p, t)      includes upstream lead time alpha(p)
+  72                   W(j, p, t)      includes downstream lead time beta(p)
+  73                   X(j, p, t)      activates W(jpt)
+  74                   Y(i, p, t)      denotes whether p is manufactured in suit
+      e i at time t. Also activates Z(ipt)
+  75                   U(j, p, t)      denotes whether p is manufactured in suit
+      e j at time t. Also activates X(jpt)
+  76   
+  77  INTEGER VARIABLES
+                       for production constraints
+  81                   CP(i, p, t)     upstream production
+  82                   FP(j, p, t)     downstream production;
+  83   
+  84  POSITIVE VARIABLES
+                       for production constraints
+  88                   CT(i, p, t)     upstream production time
+  89                   FT(j, p, t)     downstream production time
+                       for timing constraints
+  93                   CTtot(i, t)     total upstream time
+  94                   FTtot(j, t)     total downstream time
+                       for storage consraints
+  98                   CI(p, t)        amount of crude p stored at time t
+  99                   CW(p, t)        amount of crude p wasted
+ 100                   FI(p, t)        amount of final p stored at time t
+ 101                   S(p, t)         sales
+ 102                   FW(p, t)        amount of final p wasted
+                       for sales and penalty constraint
+ 106                   delta(p, t)     penalty for the late delivery of p at tim
+      e t;
+ 107   
+ 108  VARIABLE
+ 109  *                PROFIT
+ 110                   profit
+ 111                   Sold
+ 112                   TC
+ 113                   PC
+ 114                   CC
+ 115                   SC
+ 116                   BC
+ 117                   WC;
+ 118   
+ 119  EQUATIONs
+ 120  *                OBJECTIVE
+ 121                   Objective,
+ 122                   Sales,
+ 123                   TotalCost,
+ 124                   ProductionCost,
+ 125                   ChangeoverCost,
+ 126                   StorageCost,
+ 127                   BacklogCost,
+ 128                   WasteCost,
+ 129  *                production constraints
+ 130                   UpstreamProduction(i, p, t),
+ 131                   DownstreamProduction(j, p, t),
+ 132                   Zfunction(i, p, t),
+ 133                   Xfunction(j, p, t),
+ 134                   Wfunction(j, p, t),
+ 135                   Yfunction(i, t),
+ 136                   Ufunction(j, t),
+ 137  *                timing constraints
+ 138                   USP_minTiming(i, p, t),
+ 139                   USP_maxTiming(i, p, t),
+ 140                   DSP_minTiming(j, p, t),
+ 141                   DSP_maxTiming(j, p, t),
+ 142                   USP_TotalTime(i, t),
+ 143                   DSP_TotalTime(j, t),
+ 144                   USP_H(i, t),
+ 145                   DSP_H(j, t),
+ 146  *                storage constraints
+ 147                   CrudeStorage(p, t),
+ 148                   FinalStorage(p, t),
+ 149                   CrudeCapacity(p, t),
+ 150                   FinalCapacity(p, t),
+ 151                   CrudeLimit(p, t),
+ 152                   FinalLimit(p, t),
+ 153  *                sales and penalty constraint
+ 154                   del(p, t);
+                       equations definitions
+ 158  *                        OBJECTIVE function
+ 159  Objective..              profit          =E=      Sold - TC;
+ 160  Sales..                  Sold            =E=      SUM( (p, t), nu(p) * S(p
+      , t));
+ 161  ProductionCost..         PC              =E=      SUM( (i, p, t), eta(p) *
+       CP(i, p, t) ) + SUM( (j, p, t), eta(p) * FP(j, p, t) );
+ 162  ChangeoverCost..         CC              =E=      SUM( (i, p, t), psi(p) *
+       Z(i, p, t) ) + SUM( (j, p, t), psi(p) * X(j, p, t) );
+ 163  StorageCost..            SC              =E=      SUM( (p, t), rho(p) * CI
+      (p, t) + omega(p) * FI(p, t));
+ 164  BacklogCost..            BC              =E=      SUM( (p, t), d(p) * delt
+      a(p, t));
+ 165  WasteCost..              WC              =E=      SUM( (p, t), tau(p) * (C
+      W(p, t) + FW(p, t)) );
+ 166  TotalCost..              TC              =E=      PC + CC + SC + BC + WC;
+ 167  *                        production constraints
+ 168  UpstreamProduction(map(i, p), t)..               CP(i, p, t)     =E=     Z
+      (i, p, t) + CR(p) * ( CT(i, p, t) - alpha(p) * Z(i, p, t) );
+ 169  * the constaint above can be written in two ways:
+ 170  *                        UpstreamProduction(map(i, p), t)
+ 171  *                        OR
+ 172  *                        UpstreamProduction(i, p, t)$map(i, p)
+ 173  * the constraint will not be evaluated unless the conditional is true
+ 174  DownstreamProduction(j, p, t)..                  FP(j, p, t)     =E=     W
+      (j, p, t) + FR(p) * ( FT(j, p, t) - beta(p) * W(j, p, t) );
+ 175  Zfunction(map(i, p), t)..                        Z(i, p, t)      =G=     Y
+      (i, p, t) - Y(i, p, t - 1);
+ 176  Xfunction(j, p, t)..                             X(j, p, t)      =G=     U
+      (j, p, t) - U(j, p, t - 1);
+ 177  Wfunction(j, p, t)..                             W(j, p, t)      =G=     S
+      UM(i, Z(i, p, t)$map(i, p))/card(i) + X(j, p, t) - 1;
+ 178  Yfunction(i, t)..                                SUM(p, Y(i, p, t)$map(i, 
+      p)) =L=   1;
+ 179  Ufunction(j, t)..                                SUM(p, U(j, p, t)) =L=   
+      1;
+ 180  *                        timing constraints
+ 181  USP_minTiming(i, p, t)$map(i, p)..               CTmin(p) * Y(i, p, t) =L=
+       CT(i, p, t);
+ 182  USP_maxTiming(i, p, t)$map(i, p)..               CTmax(p) * Y(i, p, t) =G=
+       CT(i, p, t);
+ 183  DSP_minTiming(j, p, t)..                         FTmin(p) * U(j, p, t) =L=
+       FT(j, p, t);
+ 184  DSP_maxTiming(j, p, t)..                         FTmax(p) * U(j, p, t) =G=
+       FT(j, p, t);
+ 185  USP_TotalTime(i, t)..                            CTtot(i, t)           =E=
+       SUM(p, CT(i, p, t)$map(i, p) );
+ 186  DSP_TotalTime(j, t)..                            FTtot(j, t)           =E=
+       SUM(p, FT(j, p, t) );
+ 187  USP_H(i, t)..                                    CTtot(i, t)           =L=
+       H;
+ 188  DSP_H(j, t)..                                    FTtot(j, t)           =L=
+       H;
+ 189  *                        storage constraints
+ 190  CrudeStorage(p, t)..           CI(p, t)        =E=     CI(p, t - 1) + SUM(
+      i, CP(i, p, t)$map(i, p) )
+ 191                                                   - ((1/lambda(p)) * SUM(j,
+       FP(j, p, t)))
+ 192                                                   - CW(p, t);
+ 193  FinalStorage(p, t)..           FI(p, t)        =E=     FI(p, t - 1) + SUM(
+      j, FP(j, p, t) )
+ 194                                                   - S(p, t) - FW(p, t);
+ 195  CrudeCapacity(p, t)..          CI(p, t)        =L=     C(p);
+ 196  FinalCapacity(p, t)..          FI(p, t)        =L=     F(p);
+ 197  CrudeLimit(p, t)..             CI(p, t)        =L=     SUM((j, tt)$(ORD(tt
+      )>ORD(t) and ORD(tt)<=(ORD(t) + (zeta(p)))), FP(j, p, tt));
+ 198  FinalLimit(p, t)..             FI(p, t)        =L=     SUM((tt)$(ORD(tt)>O
+      RD(t) and ORD(tt)<=(ORD(t) + (sigma(p)))), S(p, tt) );
+ 199  *                        backlog constraints
+ 200  del(p, t)..                    delta(p, t)     =E=     delta(p, t - 1) + D
+      emand(p, t) - S(p, t);
+ 201   
+ 202  MODEL                    lakhdar2005example2 /All/;
+ 203   
+ 204                           option MIP = CPLEX;
+ 205                           option optcr = 0.0;
+ 206                           option threads = 4;
+ 207   
+ 208  SOLVE                    lakhdar2005example2 USING MIP MAXIMIZING profit;
+ 209   
+ 210  DISPLAY profit.l, Sold.l, TC.l, PC.l, BC.l, SC.l, CC.l, WC.l, FI.l, S.l, d
+      elta.l, CP.l, CT.l, FP.l, FT.l;
+ 211   
+ 212  execute_unload   "results.gdx" CP FP  CI FI CW FW S delta Z X Y U CT FT;
+ 213  execute  'Gdxxrw results.gdx output=Lakhdar2005.xlsm skipempty=0 zeroout=0
+       trace=2 index=Index!J7:L100';
+
+
+COMPILATION TIME     =        0.000 SECONDS      3 Mb  WEX239-239 Nov  9, 2012
+GAMS Rev 239  WEX-WEI 23.9.5 x86_64/MS Windows          08/05/18 20:56:27 Page 2
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Equation Listing    SOLVE lakhdar2005example2 Using MIP From line 208
+
+
+---- Objective  =E=  
+
+Objective..  profit - Sold + TC =E= 0 ; (LHS = 0)
+     
+
+---- Sales  =E=  
+
+Sales..  - 25*S(p1,t1) - 25*S(p1,t2) - 25*S(p1,t3) - 25*S(p1,t4) - 25*S(p1,t5)
+     
+      - 25*S(p1,t6) - 25*S(p1,t7) - 25*S(p1,t8) - 25*S(p1,t9) - 20*S(p2,t1)
+     
+      - 20*S(p2,t2) - 20*S(p2,t3) - 20*S(p2,t4) - 20*S(p2,t5) - 20*S(p2,t6)
+     
+      - 20*S(p2,t7) - 20*S(p2,t8) - 20*S(p2,t9) - 17*S(p3,t1) - 17*S(p3,t2)
+     
+      - 17*S(p3,t3) - 17*S(p3,t4) - 17*S(p3,t5) - 17*S(p3,t6) - 17*S(p3,t7)
+     
+      - 17*S(p3,t8) - 17*S(p3,t9) - 17*S(p4,t1) - 17*S(p4,t2) - 17*S(p4,t3)
+     
+      - 17*S(p4,t4) - 17*S(p4,t5) - 17*S(p4,t6) - 17*S(p4,t7) - 17*S(p4,t8)
+     
+      - 17*S(p4,t9) + Sold =E= 0 ; (LHS = 0)
+     
+
+---- TotalCost  =E=  
+
+TotalCost..  TC - PC - CC - SC - BC - WC =E= 0 ; (LHS = 0)
+     
+
+---- ProductionCost  =E=  
+
+ProductionCost..  - 5*CP(i1,p1,t1) - 5*CP(i1,p1,t2) - 5*CP(i1,p1,t3)
+     
+      - 5*CP(i1,p1,t4) - 5*CP(i1,p1,t5) - 5*CP(i1,p1,t6) - 5*CP(i1,p1,t7)
+     
+      - 5*CP(i1,p1,t8) - 5*CP(i1,p1,t9) - 2*CP(i1,p2,t1) - 2*CP(i1,p2,t2)
+     
+      - 2*CP(i1,p2,t3) - 2*CP(i1,p2,t4) - 2*CP(i1,p2,t5) - 2*CP(i1,p2,t6)
+     
+      - 2*CP(i1,p2,t7) - 2*CP(i1,p2,t8) - 2*CP(i1,p2,t9) - CP(i1,p3,t1)
+     
+      - CP(i1,p3,t2) - CP(i1,p3,t3) - CP(i1,p3,t4) - CP(i1,p3,t5) - CP(i1,p3,t6)
+     
+      - CP(i1,p3,t7) - CP(i1,p3,t8) - CP(i1,p3,t9) - CP(i1,p4,t1) - CP(i1,p4,t2)
+     
+      - CP(i1,p4,t3) - CP(i1,p4,t4) - CP(i1,p4,t5) - CP(i1,p4,t6) - CP(i1,p4,t7)
+     
+      - CP(i1,p4,t8) - CP(i1,p4,t9) - 5*CP(i2,p1,t1) - 5*CP(i2,p1,t2)
+     
+      - 5*CP(i2,p1,t3) - 5*CP(i2,p1,t4) - 5*CP(i2,p1,t5) - 5*CP(i2,p1,t6)
+     
+      - 5*CP(i2,p1,t7) - 5*CP(i2,p1,t8) - 5*CP(i2,p1,t9) - 2*CP(i2,p2,t1)
+     
+      - 2*CP(i2,p2,t2) - 2*CP(i2,p2,t3) - 2*CP(i2,p2,t4) - 2*CP(i2,p2,t5)
+     
+      - 2*CP(i2,p2,t6) - 2*CP(i2,p2,t7) - 2*CP(i2,p2,t8) - 2*CP(i2,p2,t9)
+     
+      - CP(i2,p3,t1) - CP(i2,p3,t2) - CP(i2,p3,t3) - CP(i2,p3,t4) - CP(i2,p3,t5)
+     
+      - CP(i2,p3,t6) - CP(i2,p3,t7) - CP(i2,p3,t8) - CP(i2,p3,t9) - CP(i2,p4,t1)
+     
+      - CP(i2,p4,t2) - CP(i2,p4,t3) - CP(i2,p4,t4) - CP(i2,p4,t5) - CP(i2,p4,t6)
+     
+      - CP(i2,p4,t7) - CP(i2,p4,t8) - CP(i2,p4,t9) - 5*FP(j1,p1,t1)
+     
+      - 5*FP(j1,p1,t2) - 5*FP(j1,p1,t3) - 5*FP(j1,p1,t4) - 5*FP(j1,p1,t5)
+     
+      - 5*FP(j1,p1,t6) - 5*FP(j1,p1,t7) - 5*FP(j1,p1,t8) - 5*FP(j1,p1,t9)
+     
+      - 2*FP(j1,p2,t1) - 2*FP(j1,p2,t2) - 2*FP(j1,p2,t3) - 2*FP(j1,p2,t4)
+     
+      - 2*FP(j1,p2,t5) - 2*FP(j1,p2,t6) - 2*FP(j1,p2,t7) - 2*FP(j1,p2,t8)
+     
+      - 2*FP(j1,p2,t9) - FP(j1,p3,t1) - FP(j1,p3,t2) - FP(j1,p3,t3)
+     
+      - FP(j1,p3,t4) - FP(j1,p3,t5) - FP(j1,p3,t6) - FP(j1,p3,t7) - FP(j1,p3,t8)
+     
+      - FP(j1,p3,t9) - FP(j1,p4,t1) - FP(j1,p4,t2) - FP(j1,p4,t3) - FP(j1,p4,t4)
+     
+      - FP(j1,p4,t5) - FP(j1,p4,t6) - FP(j1,p4,t7) - FP(j1,p4,t8) - FP(j1,p4,t9)
+     
+      - 5*FP(j2,p1,t1) - 5*FP(j2,p1,t2) - 5*FP(j2,p1,t3) - 5*FP(j2,p1,t4)
+     
+      - 5*FP(j2,p1,t5) - 5*FP(j2,p1,t6) - 5*FP(j2,p1,t7) - 5*FP(j2,p1,t8)
+     
+      - 5*FP(j2,p1,t9) - 2*FP(j2,p2,t1) - 2*FP(j2,p2,t2) - 2*FP(j2,p2,t3)
+     
+      - 2*FP(j2,p2,t4) - 2*FP(j2,p2,t5) - 2*FP(j2,p2,t6) - 2*FP(j2,p2,t7)
+     
+      - 2*FP(j2,p2,t8) - 2*FP(j2,p2,t9) - FP(j2,p3,t1) - FP(j2,p3,t2)
+     
+      - FP(j2,p3,t3) - FP(j2,p3,t4) - FP(j2,p3,t5) - FP(j2,p3,t6) - FP(j2,p3,t7)
+     
+      - FP(j2,p3,t8) - FP(j2,p3,t9) - FP(j2,p4,t1) - FP(j2,p4,t2) - FP(j2,p4,t3)
+     
+      - FP(j2,p4,t4) - FP(j2,p4,t5) - FP(j2,p4,t6) - FP(j2,p4,t7) - FP(j2,p4,t8)
+     
+      - FP(j2,p4,t9) - 5*FP(j3,p1,t1) - 5*FP(j3,p1,t2) - 5*FP(j3,p1,t3)
+     
+      - 5*FP(j3,p1,t4) - 5*FP(j3,p1,t5) - 5*FP(j3,p1,t6) - 5*FP(j3,p1,t7)
+     
+      - 5*FP(j3,p1,t8) - 5*FP(j3,p1,t9) - 2*FP(j3,p2,t1) - 2*FP(j3,p2,t2)
+     
+      - 2*FP(j3,p2,t3) - 2*FP(j3,p2,t4) - 2*FP(j3,p2,t5) - 2*FP(j3,p2,t6)
+     
+      - 2*FP(j3,p2,t7) - 2*FP(j3,p2,t8) - 2*FP(j3,p2,t9) - FP(j3,p3,t1)
+     
+      - FP(j3,p3,t2) - FP(j3,p3,t3) - FP(j3,p3,t4) - FP(j3,p3,t5) - FP(j3,p3,t6)
+     
+      - FP(j3,p3,t7) - FP(j3,p3,t8) - FP(j3,p3,t9) - FP(j3,p4,t1) - FP(j3,p4,t2)
+     
+      - FP(j3,p4,t3) - FP(j3,p4,t4) - FP(j3,p4,t5) - FP(j3,p4,t6) - FP(j3,p4,t7)
+     
+      - FP(j3,p4,t8) - FP(j3,p4,t9) + PC =E= 0 ; (LHS = 0)
+     
+
+---- ChangeoverCost  =E=  
+
+ChangeoverCost..  - Z(i1,p1,t1) - Z(i1,p1,t2) - Z(i1,p1,t3) - Z(i1,p1,t4)
+     
+      - Z(i1,p1,t5) - Z(i1,p1,t6) - Z(i1,p1,t7) - Z(i1,p1,t8) - Z(i1,p1,t9)
+     
+      - Z(i1,p2,t1) - Z(i1,p2,t2) - Z(i1,p2,t3) - Z(i1,p2,t4) - Z(i1,p2,t5)
+     
+      - Z(i1,p2,t6) - Z(i1,p2,t7) - Z(i1,p2,t8) - Z(i1,p2,t9) - Z(i1,p3,t1)
+     
+      - Z(i1,p3,t2) - Z(i1,p3,t3) - Z(i1,p3,t4) - Z(i1,p3,t5) - Z(i1,p3,t6)
+     
+      - Z(i1,p3,t7) - Z(i1,p3,t8) - Z(i1,p3,t9) - Z(i1,p4,t1) - Z(i1,p4,t2)
+     
+      - Z(i1,p4,t3) - Z(i1,p4,t4) - Z(i1,p4,t5) - Z(i1,p4,t6) - Z(i1,p4,t7)
+     
+      - Z(i1,p4,t8) - Z(i1,p4,t9) - Z(i2,p1,t1) - Z(i2,p1,t2) - Z(i2,p1,t3)
+     
+      - Z(i2,p1,t4) - Z(i2,p1,t5) - Z(i2,p1,t6) - Z(i2,p1,t7) - Z(i2,p1,t8)
+     
+      - Z(i2,p1,t9) - Z(i2,p2,t1) - Z(i2,p2,t2) - Z(i2,p2,t3) - Z(i2,p2,t4)
+     
+      - Z(i2,p2,t5) - Z(i2,p2,t6) - Z(i2,p2,t7) - Z(i2,p2,t8) - Z(i2,p2,t9)
+     
+      - Z(i2,p3,t1) - Z(i2,p3,t2) - Z(i2,p3,t3) - Z(i2,p3,t4) - Z(i2,p3,t5)
+     
+      - Z(i2,p3,t6) - Z(i2,p3,t7) - Z(i2,p3,t8) - Z(i2,p3,t9) - Z(i2,p4,t1)
+     
+      - Z(i2,p4,t2) - Z(i2,p4,t3) - Z(i2,p4,t4) - Z(i2,p4,t5) - Z(i2,p4,t6)
+     
+      - Z(i2,p4,t7) - Z(i2,p4,t8) - Z(i2,p4,t9) - X(j1,p1,t1) - X(j1,p1,t2)
+     
+      - X(j1,p1,t3) - X(j1,p1,t4) - X(j1,p1,t5) - X(j1,p1,t6) - X(j1,p1,t7)
+     
+      - X(j1,p1,t8) - X(j1,p1,t9) - X(j1,p2,t1) - X(j1,p2,t2) - X(j1,p2,t3)
+     
+      - X(j1,p2,t4) - X(j1,p2,t5) - X(j1,p2,t6) - X(j1,p2,t7) - X(j1,p2,t8)
+     
+      - X(j1,p2,t9) - X(j1,p3,t1) - X(j1,p3,t2) - X(j1,p3,t3) - X(j1,p3,t4)
+     
+      - X(j1,p3,t5) - X(j1,p3,t6) - X(j1,p3,t7) - X(j1,p3,t8) - X(j1,p3,t9)
+     
+      - X(j1,p4,t1) - X(j1,p4,t2) - X(j1,p4,t3) - X(j1,p4,t4) - X(j1,p4,t5)
+     
+      - X(j1,p4,t6) - X(j1,p4,t7) - X(j1,p4,t8) - X(j1,p4,t9) - X(j2,p1,t1)
+     
+      - X(j2,p1,t2) - X(j2,p1,t3) - X(j2,p1,t4) - X(j2,p1,t5) - X(j2,p1,t6)
+     
+      - X(j2,p1,t7) - X(j2,p1,t8) - X(j2,p1,t9) - X(j2,p2,t1) - X(j2,p2,t2)
+     
+      - X(j2,p2,t3) - X(j2,p2,t4) - X(j2,p2,t5) - X(j2,p2,t6) - X(j2,p2,t7)
+     
+      - X(j2,p2,t8) - X(j2,p2,t9) - X(j2,p3,t1) - X(j2,p3,t2) - X(j2,p3,t3)
+     
+      - X(j2,p3,t4) - X(j2,p3,t5) - X(j2,p3,t6) - X(j2,p3,t7) - X(j2,p3,t8)
+     
+      - X(j2,p3,t9) - X(j2,p4,t1) - X(j2,p4,t2) - X(j2,p4,t3) - X(j2,p4,t4)
+     
+      - X(j2,p4,t5) - X(j2,p4,t6) - X(j2,p4,t7) - X(j2,p4,t8) - X(j2,p4,t9)
+     
+      - X(j3,p1,t1) - X(j3,p1,t2) - X(j3,p1,t3) - X(j3,p1,t4) - X(j3,p1,t5)
+     
+      - X(j3,p1,t6) - X(j3,p1,t7) - X(j3,p1,t8) - X(j3,p1,t9) - X(j3,p2,t1)
+     
+      - X(j3,p2,t2) - X(j3,p2,t3) - X(j3,p2,t4) - X(j3,p2,t5) - X(j3,p2,t6)
+     
+      - X(j3,p2,t7) - X(j3,p2,t8) - X(j3,p2,t9) - X(j3,p3,t1) - X(j3,p3,t2)
+     
+      - X(j3,p3,t3) - X(j3,p3,t4) - X(j3,p3,t5) - X(j3,p3,t6) - X(j3,p3,t7)
+     
+      - X(j3,p3,t8) - X(j3,p3,t9) - X(j3,p4,t1) - X(j3,p4,t2) - X(j3,p4,t3)
+     
+      - X(j3,p4,t4) - X(j3,p4,t5) - X(j3,p4,t6) - X(j3,p4,t7) - X(j3,p4,t8)
+     
+      - X(j3,p4,t9) + CC =E= 0 ; (LHS = 0)
+     
+
+---- StorageCost  =E=  
+
+StorageCost..  - 5*CI(p1,t1) - 5*CI(p1,t2) - 5*CI(p1,t3) - 5*CI(p1,t4)
+     
+      - 5*CI(p1,t5) - 5*CI(p1,t6) - 5*CI(p1,t7) - 5*CI(p1,t8) - 5*CI(p1,t9)
+     
+      - 5*CI(p2,t1) - 5*CI(p2,t2) - 5*CI(p2,t3) - 5*CI(p2,t4) - 5*CI(p2,t5)
+     
+      - 5*CI(p2,t6) - 5*CI(p2,t7) - 5*CI(p2,t8) - 5*CI(p2,t9) - 5*CI(p3,t1)
+     
+      - 5*CI(p3,t2) - 5*CI(p3,t3) - 5*CI(p3,t4) - 5*CI(p3,t5) - 5*CI(p3,t6)
+     
+      - 5*CI(p3,t7) - 5*CI(p3,t8) - 5*CI(p3,t9) - 5*CI(p4,t1) - 5*CI(p4,t2)
+     
+      - 5*CI(p4,t3) - 5*CI(p4,t4) - 5*CI(p4,t5) - 5*CI(p4,t6) - 5*CI(p4,t7)
+     
+      - 5*CI(p4,t8) - 5*CI(p4,t9) - FI(p1,t1) - FI(p1,t2) - FI(p1,t3)
+     
+      - FI(p1,t4) - FI(p1,t5) - FI(p1,t6) - FI(p1,t7) - FI(p1,t8) - FI(p1,t9)
+     
+      - FI(p2,t1) - FI(p2,t2) - FI(p2,t3) - FI(p2,t4) - FI(p2,t5) - FI(p2,t6)
+     
+      - FI(p2,t7) - FI(p2,t8) - FI(p2,t9) - FI(p3,t1) - FI(p3,t2) - FI(p3,t3)
+     
+      - FI(p3,t4) - FI(p3,t5) - FI(p3,t6) - FI(p3,t7) - FI(p3,t8) - FI(p3,t9)
+     
+      - FI(p4,t1) - FI(p4,t2) - FI(p4,t3) - FI(p4,t4) - FI(p4,t5) - FI(p4,t6)
+     
+      - FI(p4,t7) - FI(p4,t8) - FI(p4,t9) + SC =E= 0 ; (LHS = 0)
+     
+
+---- BacklogCost  =E=  
+
+BacklogCost..  - 20*delta(p1,t1) - 20*delta(p1,t2) - 20*delta(p1,t3)
+     
+      - 20*delta(p1,t4) - 20*delta(p1,t5) - 20*delta(p1,t6) - 20*delta(p1,t7)
+     
+      - 20*delta(p1,t8) - 20*delta(p1,t9) - 20*delta(p2,t1) - 20*delta(p2,t2)
+     
+      - 20*delta(p2,t3) - 20*delta(p2,t4) - 20*delta(p2,t5) - 20*delta(p2,t6)
+     
+      - 20*delta(p2,t7) - 20*delta(p2,t8) - 20*delta(p2,t9) - 20*delta(p3,t1)
+     
+      - 20*delta(p3,t2) - 20*delta(p3,t3) - 20*delta(p3,t4) - 20*delta(p3,t5)
+     
+      - 20*delta(p3,t6) - 20*delta(p3,t7) - 20*delta(p3,t8) - 20*delta(p3,t9)
+     
+      - 20*delta(p4,t1) - 20*delta(p4,t2) - 20*delta(p4,t3) - 20*delta(p4,t4)
+     
+      - 20*delta(p4,t5) - 20*delta(p4,t6) - 20*delta(p4,t7) - 20*delta(p4,t8)
+     
+      - 20*delta(p4,t9) + BC =E= 0 ; (LHS = 0)
+     
+
+---- WasteCost  =E=  
+
+WasteCost..  - 5*CW(p1,t1) - 5*CW(p1,t2) - 5*CW(p1,t3) - 5*CW(p1,t4)
+     
+      - 5*CW(p1,t5) - 5*CW(p1,t6) - 5*CW(p1,t7) - 5*CW(p1,t8) - 5*CW(p1,t9)
+     
+      - 5*CW(p2,t1) - 5*CW(p2,t2) - 5*CW(p2,t3) - 5*CW(p2,t4) - 5*CW(p2,t5)
+     
+      - 5*CW(p2,t6) - 5*CW(p2,t7) - 5*CW(p2,t8) - 5*CW(p2,t9) - 5*CW(p3,t1)
+     
+      - 5*CW(p3,t2) - 5*CW(p3,t3) - 5*CW(p3,t4) - 5*CW(p3,t5) - 5*CW(p3,t6)
+     
+      - 5*CW(p3,t7) - 5*CW(p3,t8) - 5*CW(p3,t9) - 5*CW(p4,t1) - 5*CW(p4,t2)
+     
+      - 5*CW(p4,t3) - 5*CW(p4,t4) - 5*CW(p4,t5) - 5*CW(p4,t6) - 5*CW(p4,t7)
+     
+      - 5*CW(p4,t8) - 5*CW(p4,t9) - 5*FW(p1,t1) - 5*FW(p1,t2) - 5*FW(p1,t3)
+     
+      - 5*FW(p1,t4) - 5*FW(p1,t5) - 5*FW(p1,t6) - 5*FW(p1,t7) - 5*FW(p1,t8)
+     
+      - 5*FW(p1,t9) - 5*FW(p2,t1) - 5*FW(p2,t2) - 5*FW(p2,t3) - 5*FW(p2,t4)
+     
+      - 5*FW(p2,t5) - 5*FW(p2,t6) - 5*FW(p2,t7) - 5*FW(p2,t8) - 5*FW(p2,t9)
+     
+      - 5*FW(p3,t1) - 5*FW(p3,t2) - 5*FW(p3,t3) - 5*FW(p3,t4) - 5*FW(p3,t5)
+     
+      - 5*FW(p3,t6) - 5*FW(p3,t7) - 5*FW(p3,t8) - 5*FW(p3,t9) - 5*FW(p4,t1)
+     
+      - 5*FW(p4,t2) - 5*FW(p4,t3) - 5*FW(p4,t4) - 5*FW(p4,t5) - 5*FW(p4,t6)
+     
+      - 5*FW(p4,t7) - 5*FW(p4,t8) - 5*FW(p4,t9) + WC =E= 0 ; (LHS = 0)
+     
+
+---- UpstreamProduction  =E=  
+
+UpstreamProduction(i1,p1,t1)..  0.5*Z(i1,p1,t1) + CP(i1,p1,t1)
+     
+      - 0.05*CT(i1,p1,t1) =E= 0 ; (LHS = 0)
+     
+UpstreamProduction(i1,p1,t2)..  0.5*Z(i1,p1,t2) + CP(i1,p1,t2)
+     
+      - 0.05*CT(i1,p1,t2) =E= 0 ; (LHS = 0)
+     
+UpstreamProduction(i1,p1,t3)..  0.5*Z(i1,p1,t3) + CP(i1,p1,t3)
+     
+      - 0.05*CT(i1,p1,t3) =E= 0 ; (LHS = 0)
+     
+REMAINING 69 ENTRIES SKIPPED
+
+
+---- DownstreamProduction  =E=  
+
+DownstreamProduction(j1,p1,t1)..  3*W(j1,p1,t1) + FP(j1,p1,t1)
+     
+      - 0.1*FT(j1,p1,t1) =E= 0 ; (LHS = 0)
+     
+DownstreamProduction(j1,p1,t2)..  3*W(j1,p1,t2) + FP(j1,p1,t2)
+     
+      - 0.1*FT(j1,p1,t2) =E= 0 ; (LHS = 0)
+     
+DownstreamProduction(j1,p1,t3)..  3*W(j1,p1,t3) + FP(j1,p1,t3)
+     
+      - 0.1*FT(j1,p1,t3) =E= 0 ; (LHS = 0)
+     
+REMAINING 105 ENTRIES SKIPPED
+
+
+---- Zfunction  =G=  
+
+Zfunction(i1,p1,t1)..  Z(i1,p1,t1) - Y(i1,p1,t1) =G= 0 ; (LHS = 0)
+     
+Zfunction(i1,p1,t2)..  Z(i1,p1,t2) + Y(i1,p1,t1) - Y(i1,p1,t2) =G= 0 ; (LHS = 0)
+     
+Zfunction(i1,p1,t3)..  Z(i1,p1,t3) + Y(i1,p1,t2) - Y(i1,p1,t3) =G= 0 ; (LHS = 0)
+     
+REMAINING 69 ENTRIES SKIPPED
+
+
+---- Xfunction  =G=  
+
+Xfunction(j1,p1,t1)..  X(j1,p1,t1) - U(j1,p1,t1) =G= 0 ; (LHS = 0)
+     
+Xfunction(j1,p1,t2)..  X(j1,p1,t2) + U(j1,p1,t1) - U(j1,p1,t2) =G= 0 ; (LHS = 0)
+     
+Xfunction(j1,p1,t3)..  X(j1,p1,t3) + U(j1,p1,t2) - U(j1,p1,t3) =G= 0 ; (LHS = 0)
+     
+REMAINING 105 ENTRIES SKIPPED
+
+
+---- Wfunction  =G=  
+
+Wfunction(j1,p1,t1)..  - 0.5*Z(i1,p1,t1) - 0.5*Z(i2,p1,t1) + W(j1,p1,t1)
+     
+      - X(j1,p1,t1) =G= -1 ; (LHS = 0)
+     
+Wfunction(j1,p1,t2)..  - 0.5*Z(i1,p1,t2) - 0.5*Z(i2,p1,t2) + W(j1,p1,t2)
+     
+      - X(j1,p1,t2) =G= -1 ; (LHS = 0)
+     
+Wfunction(j1,p1,t3)..  - 0.5*Z(i1,p1,t3) - 0.5*Z(i2,p1,t3) + W(j1,p1,t3)
+     
+      - X(j1,p1,t3) =G= -1 ; (LHS = 0)
+     
+REMAINING 105 ENTRIES SKIPPED
+
+
+---- Yfunction  =L=  
+
+Yfunction(i1,t1)..  Y(i1,p1,t1) + Y(i1,p2,t1) + Y(i1,p3,t1) + Y(i1,p4,t1) =L= 1
+      ; (LHS = 0)
+     
+Yfunction(i1,t2)..  Y(i1,p1,t2) + Y(i1,p2,t2) + Y(i1,p3,t2) + Y(i1,p4,t2) =L= 1
+      ; (LHS = 0)
+     
+Yfunction(i1,t3)..  Y(i1,p1,t3) + Y(i1,p2,t3) + Y(i1,p3,t3) + Y(i1,p4,t3) =L= 1
+      ; (LHS = 0)
+     
+REMAINING 15 ENTRIES SKIPPED
+
+
+---- Ufunction  =L=  
+
+Ufunction(j1,t1)..  U(j1,p1,t1) + U(j1,p2,t1) + U(j1,p3,t1) + U(j1,p4,t1) =L= 1
+      ; (LHS = 0)
+     
+Ufunction(j1,t2)..  U(j1,p1,t2) + U(j1,p2,t2) + U(j1,p3,t2) + U(j1,p4,t2) =L= 1
+      ; (LHS = 0)
+     
+Ufunction(j1,t3)..  U(j1,p1,t3) + U(j1,p2,t3) + U(j1,p3,t3) + U(j1,p4,t3) =L= 1
+      ; (LHS = 0)
+     
+REMAINING 24 ENTRIES SKIPPED
+
+
+---- USP_minTiming  =L=  
+
+USP_minTiming(i1,p1,t1)..  20*Y(i1,p1,t1) - CT(i1,p1,t1) =L= 0 ; (LHS = 0)
+     
+USP_minTiming(i1,p1,t2)..  20*Y(i1,p1,t2) - CT(i1,p1,t2) =L= 0 ; (LHS = 0)
+     
+USP_minTiming(i1,p1,t3)..  20*Y(i1,p1,t3) - CT(i1,p1,t3) =L= 0 ; (LHS = 0)
+     
+REMAINING 69 ENTRIES SKIPPED
+
+
+---- USP_maxTiming  =G=  
+
+USP_maxTiming(i1,p1,t1)..  60*Y(i1,p1,t1) - CT(i1,p1,t1) =G= 0 ; (LHS = 0)
+     
+USP_maxTiming(i1,p1,t2)..  60*Y(i1,p1,t2) - CT(i1,p1,t2) =G= 0 ; (LHS = 0)
+     
+USP_maxTiming(i1,p1,t3)..  60*Y(i1,p1,t3) - CT(i1,p1,t3) =G= 0 ; (LHS = 0)
+     
+REMAINING 69 ENTRIES SKIPPED
+
+
+---- DSP_minTiming  =L=  
+
+DSP_minTiming(j1,p1,t1)..  10*U(j1,p1,t1) - FT(j1,p1,t1) =L= 0 ; (LHS = 0)
+     
+DSP_minTiming(j1,p1,t2)..  10*U(j1,p1,t2) - FT(j1,p1,t2) =L= 0 ; (LHS = 0)
+     
+DSP_minTiming(j1,p1,t3)..  10*U(j1,p1,t3) - FT(j1,p1,t3) =L= 0 ; (LHS = 0)
+     
+REMAINING 105 ENTRIES SKIPPED
+
+
+---- DSP_maxTiming  =G=  
+
+DSP_maxTiming(j1,p1,t1)..  60*U(j1,p1,t1) - FT(j1,p1,t1) =G= 0 ; (LHS = 0)
+     
+DSP_maxTiming(j1,p1,t2)..  60*U(j1,p1,t2) - FT(j1,p1,t2) =G= 0 ; (LHS = 0)
+     
+DSP_maxTiming(j1,p1,t3)..  60*U(j1,p1,t3) - FT(j1,p1,t3) =G= 0 ; (LHS = 0)
+     
+REMAINING 105 ENTRIES SKIPPED
+
+
+---- USP_TotalTime  =E=  
+
+USP_TotalTime(i1,t1)..  - CT(i1,p1,t1) - CT(i1,p2,t1) - CT(i1,p3,t1)
+     
+      - CT(i1,p4,t1) + CTtot(i1,t1) =E= 0 ; (LHS = 0)
+     
+USP_TotalTime(i1,t2)..  - CT(i1,p1,t2) - CT(i1,p2,t2) - CT(i1,p3,t2)
+     
+      - CT(i1,p4,t2) + CTtot(i1,t2) =E= 0 ; (LHS = 0)
+     
+USP_TotalTime(i1,t3)..  - CT(i1,p1,t3) - CT(i1,p2,t3) - CT(i1,p3,t3)
+     
+      - CT(i1,p4,t3) + CTtot(i1,t3) =E= 0 ; (LHS = 0)
+     
+REMAINING 15 ENTRIES SKIPPED
+
+
+---- DSP_TotalTime  =E=  
+
+DSP_TotalTime(j1,t1)..  - FT(j1,p1,t1) - FT(j1,p2,t1) - FT(j1,p3,t1)
+     
+      - FT(j1,p4,t1) + FTtot(j1,t1) =E= 0 ; (LHS = 0)
+     
+DSP_TotalTime(j1,t2)..  - FT(j1,p1,t2) - FT(j1,p2,t2) - FT(j1,p3,t2)
+     
+      - FT(j1,p4,t2) + FTtot(j1,t2) =E= 0 ; (LHS = 0)
+     
+DSP_TotalTime(j1,t3)..  - FT(j1,p1,t3) - FT(j1,p2,t3) - FT(j1,p3,t3)
+     
+      - FT(j1,p4,t3) + FTtot(j1,t3) =E= 0 ; (LHS = 0)
+     
+REMAINING 24 ENTRIES SKIPPED
+
+
+---- USP_H  =L=  
+
+USP_H(i1,t1)..  CTtot(i1,t1) =L= 60 ; (LHS = 0)
+     
+USP_H(i1,t2)..  CTtot(i1,t2) =L= 60 ; (LHS = 0)
+     
+USP_H(i1,t3)..  CTtot(i1,t3) =L= 60 ; (LHS = 0)
+     
+REMAINING 15 ENTRIES SKIPPED
+
+
+---- DSP_H  =L=  
+
+DSP_H(j1,t1)..  FTtot(j1,t1) =L= 60 ; (LHS = 0)
+     
+DSP_H(j1,t2)..  FTtot(j1,t2) =L= 60 ; (LHS = 0)
+     
+DSP_H(j1,t3)..  FTtot(j1,t3) =L= 60 ; (LHS = 0)
+     
+REMAINING 24 ENTRIES SKIPPED
+
+
+---- CrudeStorage  =E=  
+
+CrudeStorage(p1,t1)..  - CP(i1,p1,t1) - CP(i2,p1,t1) + FP(j1,p1,t1)
+     
+      + FP(j2,p1,t1) + FP(j3,p1,t1) + CI(p1,t1) + CW(p1,t1) =E= 0 ; (LHS = 0)
+     
+CrudeStorage(p1,t2)..  - CP(i1,p1,t2) - CP(i2,p1,t2) + FP(j1,p1,t2)
+     
+      + FP(j2,p1,t2) + FP(j3,p1,t2) - CI(p1,t1) + CI(p1,t2) + CW(p1,t2) =E= 0 ;
+     
+      (LHS = 0)
+     
+CrudeStorage(p1,t3)..  - CP(i1,p1,t3) - CP(i2,p1,t3) + FP(j1,p1,t3)
+     
+      + FP(j2,p1,t3) + FP(j3,p1,t3) - CI(p1,t2) + CI(p1,t3) + CW(p1,t3) =E= 0 ;
+     
+      (LHS = 0)
+     
+REMAINING 33 ENTRIES SKIPPED
+
+
+---- FinalStorage  =E=  
+
+FinalStorage(p1,t1)..  - FP(j1,p1,t1) - FP(j2,p1,t1) - FP(j3,p1,t1) + FI(p1,t1)
+     
+      + S(p1,t1) + FW(p1,t1) =E= 0 ; (LHS = 0)
+     
+FinalStorage(p1,t2)..  - FP(j1,p1,t2) - FP(j2,p1,t2) - FP(j3,p1,t2) - FI(p1,t1)
+     
+      + FI(p1,t2) + S(p1,t2) + FW(p1,t2) =E= 0 ; (LHS = 0)
+     
+FinalStorage(p1,t3)..  - FP(j1,p1,t3) - FP(j2,p1,t3) - FP(j3,p1,t3) - FI(p1,t2)
+     
+      + FI(p1,t3) + S(p1,t3) + FW(p1,t3) =E= 0 ; (LHS = 0)
+     
+REMAINING 33 ENTRIES SKIPPED
+
+
+---- CrudeCapacity  =L=  
+
+CrudeCapacity(p1,t1)..  CI(p1,t1) =L= 10 ; (LHS = 0)
+     
+CrudeCapacity(p1,t2)..  CI(p1,t2) =L= 10 ; (LHS = 0)
+     
+CrudeCapacity(p1,t3)..  CI(p1,t3) =L= 10 ; (LHS = 0)
+     
+REMAINING 33 ENTRIES SKIPPED
+
+
+---- FinalCapacity  =L=  
+
+FinalCapacity(p1,t1)..  FI(p1,t1) =L= 40 ; (LHS = 0)
+     
+FinalCapacity(p1,t2)..  FI(p1,t2) =L= 40 ; (LHS = 0)
+     
+FinalCapacity(p1,t3)..  FI(p1,t3) =L= 40 ; (LHS = 0)
+     
+REMAINING 33 ENTRIES SKIPPED
+
+
+---- CrudeLimit  =L=  
+
+CrudeLimit(p1,t1)..  - FP(j1,p1,t2) - FP(j2,p1,t2) - FP(j3,p1,t2) + CI(p1,t1)
+      =L= 0 ; (LHS = 0)
+     
+CrudeLimit(p1,t2)..  - FP(j1,p1,t3) - FP(j2,p1,t3) - FP(j3,p1,t3) + CI(p1,t2)
+      =L= 0 ; (LHS = 0)
+     
+CrudeLimit(p1,t3)..  - FP(j1,p1,t4) - FP(j2,p1,t4) - FP(j3,p1,t4) + CI(p1,t3)
+      =L= 0 ; (LHS = 0)
+     
+REMAINING 33 ENTRIES SKIPPED
+
+
+---- FinalLimit  =L=  
+
+FinalLimit(p1,t1)..  FI(p1,t1) - S(p1,t2) - S(p1,t3) - S(p1,t4) =L= 0 ;
+     
+      (LHS = 0)
+     
+FinalLimit(p1,t2)..  FI(p1,t2) - S(p1,t3) - S(p1,t4) - S(p1,t5) =L= 0 ;
+     
+      (LHS = 0)
+     
+FinalLimit(p1,t3)..  FI(p1,t3) - S(p1,t4) - S(p1,t5) - S(p1,t6) =L= 0 ;
+     
+      (LHS = 0)
+     
+REMAINING 33 ENTRIES SKIPPED
+
+
+---- del  =E=  
+
+del(p1,t1)..  S(p1,t1) + delta(p1,t1) =E= 0 ; (LHS = 0)
+     
+del(p1,t2)..  S(p1,t2) - delta(p1,t1) + delta(p1,t2) =E= 0 ; (LHS = 0)
+     
+del(p1,t3)..  S(p1,t3) - delta(p1,t2) + delta(p1,t3) =E= 0 ; (LHS = 0)
+     
+REMAINING 33 ENTRIES SKIPPED
+
+GAMS Rev 239  WEX-WEI 23.9.5 x86_64/MS Windows          08/05/18 20:56:27 Page 3
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Column Listing      SOLVE lakhdar2005example2 Using MIP From line 208
+
+
+---- Z  includes upstream lead time alpha(p)
+
+Z(i1,p1,t1)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+       -1       ChangeoverCost
+        0.5     UpstreamProduction(i1,p1,t1)
+        1       Zfunction(i1,p1,t1)
+       -0.5     Wfunction(j1,p1,t1)
+       -0.5     Wfunction(j2,p1,t1)
+       -0.5     Wfunction(j3,p1,t1)
+
+Z(i1,p1,t2)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+       -1       ChangeoverCost
+        0.5     UpstreamProduction(i1,p1,t2)
+        1       Zfunction(i1,p1,t2)
+       -0.5     Wfunction(j1,p1,t2)
+       -0.5     Wfunction(j2,p1,t2)
+       -0.5     Wfunction(j3,p1,t2)
+
+Z(i1,p1,t3)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+       -1       ChangeoverCost
+        0.5     UpstreamProduction(i1,p1,t3)
+        1       Zfunction(i1,p1,t3)
+       -0.5     Wfunction(j1,p1,t3)
+       -0.5     Wfunction(j2,p1,t3)
+       -0.5     Wfunction(j3,p1,t3)
+
+REMAINING 69 ENTRIES SKIPPED
+
+---- W  includes downstream lead time beta(p)
+
+W(j1,p1,t1)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+        3       DownstreamProduction(j1,p1,t1)
+        1       Wfunction(j1,p1,t1)
+
+W(j1,p1,t2)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+        3       DownstreamProduction(j1,p1,t2)
+        1       Wfunction(j1,p1,t2)
+
+W(j1,p1,t3)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+        3       DownstreamProduction(j1,p1,t3)
+        1       Wfunction(j1,p1,t3)
+
+REMAINING 105 ENTRIES SKIPPED
+
+---- X  activates W(jpt)
+
+X(j1,p1,t1)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+       -1       ChangeoverCost
+        1       Xfunction(j1,p1,t1)
+       -1       Wfunction(j1,p1,t1)
+
+X(j1,p1,t2)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+       -1       ChangeoverCost
+        1       Xfunction(j1,p1,t2)
+       -1       Wfunction(j1,p1,t2)
+
+X(j1,p1,t3)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+       -1       ChangeoverCost
+        1       Xfunction(j1,p1,t3)
+       -1       Wfunction(j1,p1,t3)
+
+REMAINING 105 ENTRIES SKIPPED
+
+---- Y  denotes whether p is manufactured in suite i at time t. Also activates Z
+        (ipt)
+
+Y(i1,p1,t1)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+       -1       Zfunction(i1,p1,t1)
+        1       Zfunction(i1,p1,t2)
+        1       Yfunction(i1,t1)
+       20       USP_minTiming(i1,p1,t1)
+       60       USP_maxTiming(i1,p1,t1)
+
+Y(i1,p1,t2)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+       -1       Zfunction(i1,p1,t2)
+        1       Zfunction(i1,p1,t3)
+        1       Yfunction(i1,t2)
+       20       USP_minTiming(i1,p1,t2)
+       60       USP_maxTiming(i1,p1,t2)
+
+Y(i1,p1,t3)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+       -1       Zfunction(i1,p1,t3)
+        1       Zfunction(i1,p1,t4)
+        1       Yfunction(i1,t3)
+       20       USP_minTiming(i1,p1,t3)
+       60       USP_maxTiming(i1,p1,t3)
+
+REMAINING 69 ENTRIES SKIPPED
+
+---- U  denotes whether p is manufactured in suite j at time t. Also activates X
+        (jpt)
+
+U(j1,p1,t1)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+       -1       Xfunction(j1,p1,t1)
+        1       Xfunction(j1,p1,t2)
+        1       Ufunction(j1,t1)
+       10       DSP_minTiming(j1,p1,t1)
+       60       DSP_maxTiming(j1,p1,t1)
+
+U(j1,p1,t2)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+       -1       Xfunction(j1,p1,t2)
+        1       Xfunction(j1,p1,t3)
+        1       Ufunction(j1,t2)
+       10       DSP_minTiming(j1,p1,t2)
+       60       DSP_maxTiming(j1,p1,t2)
+
+U(j1,p1,t3)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+       -1       Xfunction(j1,p1,t3)
+        1       Xfunction(j1,p1,t4)
+        1       Ufunction(j1,t3)
+       10       DSP_minTiming(j1,p1,t3)
+       60       DSP_maxTiming(j1,p1,t3)
+
+REMAINING 105 ENTRIES SKIPPED
+
+---- CP  upstream production
+
+CP(i1,p1,t1)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -5       ProductionCost
+        1       UpstreamProduction(i1,p1,t1)
+       -1       CrudeStorage(p1,t1)
+
+CP(i1,p1,t2)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -5       ProductionCost
+        1       UpstreamProduction(i1,p1,t2)
+       -1       CrudeStorage(p1,t2)
+
+CP(i1,p1,t3)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -5       ProductionCost
+        1       UpstreamProduction(i1,p1,t3)
+       -1       CrudeStorage(p1,t3)
+
+REMAINING 69 ENTRIES SKIPPED
+
+---- FP  downstream production
+
+FP(j1,p1,t1)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -5       ProductionCost
+        1       DownstreamProduction(j1,p1,t1)
+        1       CrudeStorage(p1,t1)
+       -1       FinalStorage(p1,t1)
+
+FP(j1,p1,t2)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -5       ProductionCost
+        1       DownstreamProduction(j1,p1,t2)
+        1       CrudeStorage(p1,t2)
+       -1       FinalStorage(p1,t2)
+       -1       CrudeLimit(p1,t1)
+
+FP(j1,p1,t3)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -5       ProductionCost
+        1       DownstreamProduction(j1,p1,t3)
+        1       CrudeStorage(p1,t3)
+       -1       FinalStorage(p1,t3)
+       -1       CrudeLimit(p1,t2)
+
+REMAINING 105 ENTRIES SKIPPED
+
+---- CT  upstream production time
+
+CT(i1,p1,t1)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -0.05    UpstreamProduction(i1,p1,t1)
+       -1       USP_minTiming(i1,p1,t1)
+       -1       USP_maxTiming(i1,p1,t1)
+       -1       USP_TotalTime(i1,t1)
+
+CT(i1,p1,t2)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -0.05    UpstreamProduction(i1,p1,t2)
+       -1       USP_minTiming(i1,p1,t2)
+       -1       USP_maxTiming(i1,p1,t2)
+       -1       USP_TotalTime(i1,t2)
+
+CT(i1,p1,t3)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -0.05    UpstreamProduction(i1,p1,t3)
+       -1       USP_minTiming(i1,p1,t3)
+       -1       USP_maxTiming(i1,p1,t3)
+       -1       USP_TotalTime(i1,t3)
+
+REMAINING 69 ENTRIES SKIPPED
+
+---- FT  downstream production time
+
+FT(j1,p1,t1)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -0.1     DownstreamProduction(j1,p1,t1)
+       -1       DSP_minTiming(j1,p1,t1)
+       -1       DSP_maxTiming(j1,p1,t1)
+       -1       DSP_TotalTime(j1,t1)
+
+FT(j1,p1,t2)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -0.1     DownstreamProduction(j1,p1,t2)
+       -1       DSP_minTiming(j1,p1,t2)
+       -1       DSP_maxTiming(j1,p1,t2)
+       -1       DSP_TotalTime(j1,t2)
+
+FT(j1,p1,t3)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -0.1     DownstreamProduction(j1,p1,t3)
+       -1       DSP_minTiming(j1,p1,t3)
+       -1       DSP_maxTiming(j1,p1,t3)
+       -1       DSP_TotalTime(j1,t3)
+
+REMAINING 105 ENTRIES SKIPPED
+
+---- CTtot  total upstream time
+
+CTtot(i1,t1)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+        1       USP_TotalTime(i1,t1)
+        1       USP_H(i1,t1)
+
+CTtot(i1,t2)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+        1       USP_TotalTime(i1,t2)
+        1       USP_H(i1,t2)
+
+CTtot(i1,t3)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+        1       USP_TotalTime(i1,t3)
+        1       USP_H(i1,t3)
+
+REMAINING 15 ENTRIES SKIPPED
+
+---- FTtot  total downstream time
+
+FTtot(j1,t1)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+        1       DSP_TotalTime(j1,t1)
+        1       DSP_H(j1,t1)
+
+FTtot(j1,t2)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+        1       DSP_TotalTime(j1,t2)
+        1       DSP_H(j1,t2)
+
+FTtot(j1,t3)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+        1       DSP_TotalTime(j1,t3)
+        1       DSP_H(j1,t3)
+
+REMAINING 24 ENTRIES SKIPPED
+
+---- CI  amount of crude p stored at time t
+
+CI(p1,t1)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -5       StorageCost
+        1       CrudeStorage(p1,t1)
+       -1       CrudeStorage(p1,t2)
+        1       CrudeCapacity(p1,t1)
+        1       CrudeLimit(p1,t1)
+
+CI(p1,t2)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -5       StorageCost
+        1       CrudeStorage(p1,t2)
+       -1       CrudeStorage(p1,t3)
+        1       CrudeCapacity(p1,t2)
+        1       CrudeLimit(p1,t2)
+
+CI(p1,t3)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -5       StorageCost
+        1       CrudeStorage(p1,t3)
+       -1       CrudeStorage(p1,t4)
+        1       CrudeCapacity(p1,t3)
+        1       CrudeLimit(p1,t3)
+
+REMAINING 33 ENTRIES SKIPPED
+
+---- CW  amount of crude p wasted
+
+CW(p1,t1)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -5       WasteCost
+        1       CrudeStorage(p1,t1)
+
+CW(p1,t2)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -5       WasteCost
+        1       CrudeStorage(p1,t2)
+
+CW(p1,t3)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -5       WasteCost
+        1       CrudeStorage(p1,t3)
+
+REMAINING 33 ENTRIES SKIPPED
+
+---- FI  amount of final p stored at time t
+
+FI(p1,t1)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -1       StorageCost
+        1       FinalStorage(p1,t1)
+       -1       FinalStorage(p1,t2)
+        1       FinalCapacity(p1,t1)
+        1       FinalLimit(p1,t1)
+
+FI(p1,t2)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -1       StorageCost
+        1       FinalStorage(p1,t2)
+       -1       FinalStorage(p1,t3)
+        1       FinalCapacity(p1,t2)
+        1       FinalLimit(p1,t2)
+
+FI(p1,t3)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -1       StorageCost
+        1       FinalStorage(p1,t3)
+       -1       FinalStorage(p1,t4)
+        1       FinalCapacity(p1,t3)
+        1       FinalLimit(p1,t3)
+
+REMAINING 33 ENTRIES SKIPPED
+
+---- S  sales
+
+S(p1,t1)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+      -25       Sales
+        1       FinalStorage(p1,t1)
+        1       del(p1,t1)
+
+S(p1,t2)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+      -25       Sales
+        1       FinalStorage(p1,t2)
+       -1       FinalLimit(p1,t1)
+        1       del(p1,t2)
+
+S(p1,t3)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+      -25       Sales
+        1       FinalStorage(p1,t3)
+       -1       FinalLimit(p1,t1)
+       -1       FinalLimit(p1,t2)
+        1       del(p1,t3)
+
+REMAINING 33 ENTRIES SKIPPED
+
+---- FW  amount of final p wasted
+
+FW(p1,t1)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -5       WasteCost
+        1       FinalStorage(p1,t1)
+
+FW(p1,t2)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -5       WasteCost
+        1       FinalStorage(p1,t2)
+
+FW(p1,t3)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -5       WasteCost
+        1       FinalStorage(p1,t3)
+
+REMAINING 33 ENTRIES SKIPPED
+
+---- delta  penalty for the late delivery of p at time t
+
+delta(p1,t1)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+      -20       BacklogCost
+        1       del(p1,t1)
+       -1       del(p1,t2)
+
+delta(p1,t2)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+      -20       BacklogCost
+        1       del(p1,t2)
+       -1       del(p1,t3)
+
+delta(p1,t3)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+      -20       BacklogCost
+        1       del(p1,t3)
+       -1       del(p1,t4)
+
+REMAINING 33 ENTRIES SKIPPED
+
+---- profit  
+
+profit
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+        1       Objective
+
+
+---- Sold  
+
+Sold
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+       -1       Objective
+        1       Sales
+
+
+---- TC  
+
+TC
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+        1       Objective
+        1       TotalCost
+
+
+---- PC  
+
+PC
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+       -1       TotalCost
+        1       ProductionCost
+
+
+---- CC  
+
+CC
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+       -1       TotalCost
+        1       ChangeoverCost
+
+
+---- SC  
+
+SC
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+       -1       TotalCost
+        1       StorageCost
+
+
+---- BC  
+
+BC
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+       -1       TotalCost
+        1       BacklogCost
+
+
+---- WC  
+
+WC
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+       -1       TotalCost
+        1       WasteCost
+
+
+****
+****  180 Integer +INF Bounds have been reset to 100
+****
+GAMS Rev 239  WEX-WEI 23.9.5 x86_64/MS Windows          08/05/18 20:56:27 Page 4
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Model Statistics    SOLVE lakhdar2005example2 Using MIP From line 208
+
+
+MODEL STATISTICS
+
+BLOCKS OF EQUATIONS          30     SINGLE EQUATIONS        1,223
+BLOCKS OF VARIABLES          25     SINGLE VARIABLES        1,097
+NON ZERO ELEMENTS         4,213     DISCRETE VARIABLES        648
+
+
+GENERATION TIME      =        0.094 SECONDS      4 Mb  WEX239-239 Nov  9, 2012
+
+
+EXECUTION TIME       =        0.094 SECONDS      4 Mb  WEX239-239 Nov  9, 2012
+GAMS Rev 239  WEX-WEI 23.9.5 x86_64/MS Windows          08/05/18 20:56:27 Page 5
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Solution Report     SOLVE lakhdar2005example2 Using MIP From line 208
+
+
+               S O L V E      S U M M A R Y
+
+     MODEL   lakhdar2005example2   OBJECTIVE  profit
+     TYPE    MIP                   DIRECTION  MAXIMIZE
+     SOLVER  CPLEX                 FROM LINE  208
+
+**** SOLVER STATUS     1 Normal Completion         
+**** MODEL STATUS      1 Optimal                   
+**** OBJECTIVE VALUE              598.0000
+
+ RESOURCE USAGE, LIMIT         18.985      1000.000
+ ITERATION COUNT, LIMIT    780620    2000000000
+
+IBM ILOG CPLEX   Jul  4, 2012 23.9.5 WEX 36376.36401 WEI x86_64/MS Windows
+--- GAMS/Cplex licensed for continuous and discrete problems.
+Cplex 12.4.0.1
+
+MIP status(101): integer optimal solution
+Fixing integer variables, and solving final LP...
+Fixed MIP status(1): optimal
+Proven optimal solution.
+
+MIP Solution:          598.000000    (780596 iterations, 11740 nodes)
+Final Solve:           598.000000    (24 iterations)
+
+Best possible:         598.000000
+Absolute gap:            0.000000
+Relative gap:            0.000000
+
+
+                       LOWER     LEVEL     UPPER    MARGINAL
+
+---- EQU Objective       .         .         .        1.000      
+---- EQU Sales           .         .         .        1.000      
+---- EQU TotalCost       .         .         .       -1.000      
+---- EQU Productio~      .         .         .       -1.000      
+---- EQU Changeove~      .         .         .       -1.000      
+---- EQU StorageCo~      .         .         .       -1.000      
+---- EQU BacklogCo~      .         .         .       -1.000      
+---- EQU WasteCost       .         .         .       -1.000      
+
+---- EQU UpstreamProduction  
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+i1.p1.t1      .         .         .         .         
+i1.p1.t2      .         .         .         .         
+i1.p1.t3      .         .         .         EPS       
+i1.p1.t4      .         .         .         EPS       
+i1.p1.t5      .         .         .         .         
+i1.p1.t6      .         .         .         .         
+i1.p1.t7      .         .         .         .         
+i1.p1.t8      .         .         .         .         
+i1.p1.t9      .         .         .         .         
+i1.p2.t1      .         .         .         EPS       
+i1.p2.t2      .         .         .         EPS       
+i1.p2.t3      .         .         .         .         
+i1.p2.t4      .         .         .         .         
+i1.p2.t5      .         .         .         .         
+i1.p2.t6      .         .         .         .         
+i1.p2.t7      .         .         .         EPS       
+i1.p2.t8      .         .         .         EPS       
+i1.p2.t9      .         .         .         .         
+i1.p3.t1      .         .         .         .         
+i1.p3.t2      .         .         .         .         
+i1.p3.t3      .         .         .         .         
+i1.p3.t4      .         .         .         .         
+i1.p3.t5      .         .         .         EPS       
+i1.p3.t6      .         .         .         EPS       
+i1.p3.t7      .         .         .         .         
+i1.p3.t8      .         .         .         .         
+i1.p3.t9      .         .         .         EPS       
+i1.p4.t1      .         .         .         .         
+i1.p4.t2      .         .         .         .         
+i1.p4.t3      .         .         .         .         
+i1.p4.t4      .         .         .         .         
+i1.p4.t5      .         .         .         .         
+i1.p4.t6      .         .         .         .         
+i1.p4.t7      .         .         .         .         
+i1.p4.t8      .         .         .         .         
+i1.p4.t9      .         .         .         .         
+i2.p1.t1      .         .         .         .         
+i2.p1.t2      .         .         .         .         
+i2.p1.t3      .         .         .         .         
+i2.p1.t4      .         .         .         .         
+i2.p1.t5      .         .         .         .         
+i2.p1.t6      .         .         .         EPS       
+i2.p1.t7      .         .         .         EPS       
+i2.p1.t8      .         .         .         EPS       
+i2.p1.t9      .         .         .         .         
+i2.p2.t1      .         .         .         .         
+i2.p2.t2      .         .         .         .         
+i2.p2.t3      .         .         .         .         
+i2.p2.t4      .         .         .         .         
+i2.p2.t5      .         .         .         .         
+i2.p2.t6      .         .         .         .         
+i2.p2.t7      .         .         .         .         
+i2.p2.t8      .         .         .         .         
+i2.p2.t9      .         .         .         .         
+i2.p3.t1      .         .         .         .         
+i2.p3.t2      .         .         .         .         
+i2.p3.t3      .         .         .         .         
+i2.p3.t4      .         .         .         .         
+i2.p3.t5      .         .         .         EPS       
+i2.p3.t6      .         .         .         .         
+i2.p3.t7      .         .         .         .         
+i2.p3.t8      .         .         .         .         
+i2.p3.t9      .         .         .         EPS       
+i2.p4.t1      .         .         .         EPS       
+i2.p4.t2      .         .         .         EPS       
+i2.p4.t3      .         .         .         EPS       
+i2.p4.t4      .         .         .         EPS       
+i2.p4.t5      .         .         .         .         
+i2.p4.t6      .         .         .         .         
+i2.p4.t7      .         .         .         .         
+i2.p4.t8      .         .         .         .         
+i2.p4.t9      .         .         .         .         
+
+---- EQU DownstreamProduction  
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+j1.p1.t1      .         .         .         .         
+j1.p1.t2      .         .         .         .         
+j1.p1.t3      .         .         .         EPS       
+j1.p1.t4      .         .         .         EPS       
+j1.p1.t5      .         .         .         EPS       
+j1.p1.t6      .         .         .         EPS       
+j1.p1.t7      .         .         .         EPS       
+j1.p1.t8      .         .         .         EPS       
+j1.p1.t9      .         .         .         .         
+j1.p2.t1      .         .         .         .         
+j1.p2.t2      .         .         .         .         
+j1.p2.t3      .         .         .         .         
+j1.p2.t4      .         .         .         .         
+j1.p2.t5      .         .         .         .         
+j1.p2.t6      .         .         .         .         
+j1.p2.t7      .         .         .         .         
+j1.p2.t8      .         .         .         .         
+j1.p2.t9      .         .         .         .         
+j1.p3.t1      .         .         .         .         
+j1.p3.t2      .         .         .         .         
+j1.p3.t3      .         .         .         .         
+j1.p3.t4      .         .         .         .         
+j1.p3.t5      .         .         .         .         
+j1.p3.t6      .         .         .         .         
+j1.p3.t7      .         .         .         .         
+j1.p3.t8      .         .         .         .         
+j1.p3.t9      .         .         .         .         
+j1.p4.t1      .         .         .         .         
+j1.p4.t2      .         .         .         .         
+j1.p4.t3      .         .         .         .         
+j1.p4.t4      .         .         .         .         
+j1.p4.t5      .         .         .         .         
+j1.p4.t6      .         .         .         .         
+j1.p4.t7      .         .         .         .         
+j1.p4.t8      .         .         .         .         
+j1.p4.t9      .         .         .         .         
+j2.p1.t1      .         .         .         .         
+j2.p1.t2      .         .         .         .         
+j2.p1.t3      .         .         .         .         
+j2.p1.t4      .         .         .         .         
+j2.p1.t5      .         .         .         .         
+j2.p1.t6      .         .         .         .         
+j2.p1.t7      .         .         .         .         
+j2.p1.t8      .         .         .         .         
+j2.p1.t9      .         .         .         .         
+j2.p2.t1      .         .         .         EPS       
+j2.p2.t2      .         .         .         EPS       
+j2.p2.t3      .         .         .         .         
+j2.p2.t4      .         .         .         .         
+j2.p2.t5      .         .         .         .         
+j2.p2.t6      .         .         .         .         
+j2.p2.t7      .         .         .         EPS       
+j2.p2.t8      .         .         .         EPS       
+j2.p2.t9      .         .         .         .         
+j2.p3.t1      .         .         .         .         
+j2.p3.t2      .         .         .         .         
+j2.p3.t3      .         .         .         .         
+j2.p3.t4      .         .         .         EPS       
+j2.p3.t5      .         .         .         EPS       
+j2.p3.t6      .         .         .         EPS       
+j2.p3.t7      .         .         .         .         
+j2.p3.t8      .         .         .         .         
+j2.p3.t9      .         .         .         EPS       
+j2.p4.t1      .         .         .         .         
+j2.p4.t2      .         .         .         .         
+j2.p4.t3      .         .         .         .         
+j2.p4.t4      .         .         .         .         
+j2.p4.t5      .         .         .         .         
+j2.p4.t6      .         .         .         .         
+j2.p4.t7      .         .         .         .         
+j2.p4.t8      .         .         .         .         
+j2.p4.t9      .         .         .         .         
+j3.p1.t1      .         .         .         .         
+j3.p1.t2      .         .         .         .         
+j3.p1.t3      .         .         .         .         
+j3.p1.t4      .         .         .         .         
+j3.p1.t5      .         .         .         .         
+j3.p1.t6      .         .         .         .         
+j3.p1.t7      .         .         .         .         
+j3.p1.t8      .         .         .         .         
+j3.p1.t9      .         .         .         .         
+j3.p2.t1      .         .         .         .         
+j3.p2.t2      .         .         .         .         
+j3.p2.t3      .         .         .         .         
+j3.p2.t4      .         .         .         .         
+j3.p2.t5      .         .         .         .         
+j3.p2.t6      .         .         .         .         
+j3.p2.t7      .         .         .         .         
+j3.p2.t8      .         .         .         .         
+j3.p2.t9      .         .         .         .         
+j3.p3.t1      .         .         .         .         
+j3.p3.t2      .         .         .         .         
+j3.p3.t3      .         .         .         .         
+j3.p3.t4      .         .         .         .         
+j3.p3.t5      .         .         .         EPS       
+j3.p3.t6      .         .         .         EPS       
+j3.p3.t7      .         .         .         EPS       
+j3.p3.t8      .         .         .         EPS       
+j3.p3.t9      .         .         .         EPS       
+j3.p4.t1      .         .         .         EPS       
+j3.p4.t2      .         .         .         EPS       
+j3.p4.t3      .         .         .         EPS       
+j3.p4.t4      .         .         .         EPS       
+j3.p4.t5      .         .         .         .         
+j3.p4.t6      .         .         .         .         
+j3.p4.t7      .         .         .         .         
+j3.p4.t8      .         .         .         .         
+j3.p4.t9      .         .         .         .         
+
+---- EQU Zfunction  
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+i1.p1.t1      .         .        +INF       .         
+i1.p1.t2      .         .        +INF       .         
+i1.p1.t3      .         .        +INF       .         
+i1.p1.t4      .         .        +INF       .         
+i1.p1.t5      .        1.000     +INF       .         
+i1.p1.t6      .         .        +INF       .         
+i1.p1.t7      .         .        +INF       .         
+i1.p1.t8      .         .        +INF       .         
+i1.p1.t9      .         .        +INF       .         
+i1.p2.t1      .         .        +INF       .         
+i1.p2.t2      .         .        +INF       .         
+i1.p2.t3      .        1.000     +INF       .         
+i1.p2.t4      .         .        +INF       .         
+i1.p2.t5      .         .        +INF       .         
+i1.p2.t6      .         .        +INF       .         
+i1.p2.t7      .         .        +INF       .         
+i1.p2.t8      .         .        +INF       .         
+i1.p2.t9      .        1.000     +INF       .         
+i1.p3.t1      .         .        +INF       .         
+i1.p3.t2      .         .        +INF       .         
+i1.p3.t3      .         .        +INF       .         
+i1.p3.t4      .         .        +INF       .         
+i1.p3.t5      .         .        +INF       .         
+i1.p3.t6      .         .        +INF       .         
+i1.p3.t7      .        1.000     +INF       .         
+i1.p3.t8      .         .        +INF       .         
+i1.p3.t9      .         .        +INF       .         
+i1.p4.t1      .         .        +INF       .         
+i1.p4.t2      .         .        +INF       .         
+i1.p4.t3      .         .        +INF       .         
+i1.p4.t4      .         .        +INF       .         
+i1.p4.t5      .         .        +INF       .         
+i1.p4.t6      .         .        +INF       .         
+i1.p4.t7      .         .        +INF       .         
+i1.p4.t8      .         .        +INF       .         
+i1.p4.t9      .         .        +INF       .         
+i2.p1.t1      .         .        +INF       .         
+i2.p1.t2      .         .        +INF       .         
+i2.p1.t3      .         .        +INF       .         
+i2.p1.t4      .         .        +INF       .         
+i2.p1.t5      .         .        +INF       .         
+i2.p1.t6      .         .        +INF       .         
+i2.p1.t7      .         .        +INF       .         
+i2.p1.t8      .         .        +INF       .         
+i2.p1.t9      .        1.000     +INF       .         
+i2.p2.t1      .         .        +INF       .         
+i2.p2.t2      .         .        +INF       .         
+i2.p2.t3      .         .        +INF       .         
+i2.p2.t4      .         .        +INF       .         
+i2.p2.t5      .         .        +INF       .         
+i2.p2.t6      .         .        +INF       .         
+i2.p2.t7      .         .        +INF       .         
+i2.p2.t8      .         .        +INF       .         
+i2.p2.t9      .         .        +INF       .         
+i2.p3.t1      .         .        +INF       .         
+i2.p3.t2      .         .        +INF       .         
+i2.p3.t3      .         .        +INF       .         
+i2.p3.t4      .         .        +INF       .         
+i2.p3.t5      .         .        +INF       .         
+i2.p3.t6      .        1.000     +INF       .         
+i2.p3.t7      .         .        +INF       .         
+i2.p3.t8      .         .        +INF       .         
+i2.p3.t9      .         .        +INF       .         
+i2.p4.t1      .         .        +INF       .         
+i2.p4.t2      .         .        +INF       .         
+i2.p4.t3      .         .        +INF       .         
+i2.p4.t4      .         .        +INF       .         
+i2.p4.t5      .        1.000     +INF       .         
+i2.p4.t6      .         .        +INF       .         
+i2.p4.t7      .         .        +INF       .         
+i2.p4.t8      .         .        +INF       .         
+i2.p4.t9      .         .        +INF       .         
+
+---- EQU Xfunction  
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+j1.p1.t1      .         .        +INF       .         
+j1.p1.t2      .         .        +INF       .         
+j1.p1.t3      .         .        +INF       .         
+j1.p1.t4      .         .        +INF       .         
+j1.p1.t5      .         .        +INF       .         
+j1.p1.t6      .         .        +INF       .         
+j1.p1.t7      .         .        +INF       .         
+j1.p1.t8      .         .        +INF       .         
+j1.p1.t9      .        1.000     +INF       .         
+j1.p2.t1      .         .        +INF       .         
+j1.p2.t2      .         .        +INF       .         
+j1.p2.t3      .         .        +INF       .         
+j1.p2.t4      .         .        +INF       .         
+j1.p2.t5      .         .        +INF       .         
+j1.p2.t6      .         .        +INF       .         
+j1.p2.t7      .         .        +INF       .         
+j1.p2.t8      .         .        +INF       .         
+j1.p2.t9      .         .        +INF       .         
+j1.p3.t1      .         .        +INF       .         
+j1.p3.t2      .         .        +INF       .         
+j1.p3.t3      .         .        +INF       .         
+j1.p3.t4      .         .        +INF       .         
+j1.p3.t5      .         .        +INF       .         
+j1.p3.t6      .         .        +INF       .         
+j1.p3.t7      .         .        +INF       .         
+j1.p3.t8      .         .        +INF       .         
+j1.p3.t9      .         .        +INF       .         
+j1.p4.t1      .         .        +INF       .         
+j1.p4.t2      .         .        +INF       .         
+j1.p4.t3      .         .        +INF       .         
+j1.p4.t4      .         .        +INF       .         
+j1.p4.t5      .         .        +INF       .         
+j1.p4.t6      .         .        +INF       .         
+j1.p4.t7      .         .        +INF       .         
+j1.p4.t8      .         .        +INF       .         
+j1.p4.t9      .         .        +INF       .         
+j2.p1.t1      .         .        +INF       .         
+j2.p1.t2      .         .        +INF       .         
+j2.p1.t3      .         .        +INF       .         
+j2.p1.t4      .         .        +INF       .         
+j2.p1.t5      .         .        +INF       .         
+j2.p1.t6      .         .        +INF       .         
+j2.p1.t7      .         .        +INF       .         
+j2.p1.t8      .         .        +INF       .         
+j2.p1.t9      .         .        +INF       .         
+j2.p2.t1      .         .        +INF       .         
+j2.p2.t2      .         .        +INF       .         
+j2.p2.t3      .        1.000     +INF       .         
+j2.p2.t4      .         .        +INF       .         
+j2.p2.t5      .         .        +INF       .         
+j2.p2.t6      .         .        +INF       .         
+j2.p2.t7      .         .        +INF       .         
+j2.p2.t8      .         .        +INF       .         
+j2.p2.t9      .        1.000     +INF       .         
+j2.p3.t1      .         .        +INF       .         
+j2.p3.t2      .         .        +INF       .         
+j2.p3.t3      .         .        +INF       .         
+j2.p3.t4      .         .        +INF       .         
+j2.p3.t5      .         .        +INF       .         
+j2.p3.t6      .         .        +INF       .         
+j2.p3.t7      .        1.000     +INF       .         
+j2.p3.t8      .         .        +INF       .         
+j2.p3.t9      .         .        +INF       .         
+j2.p4.t1      .         .        +INF       .         
+j2.p4.t2      .         .        +INF       .         
+j2.p4.t3      .         .        +INF       .         
+j2.p4.t4      .         .        +INF       .         
+j2.p4.t5      .         .        +INF       .         
+j2.p4.t6      .         .        +INF       .         
+j2.p4.t7      .         .        +INF       .         
+j2.p4.t8      .         .        +INF       .         
+j2.p4.t9      .         .        +INF       .         
+j3.p1.t1      .         .        +INF       .         
+j3.p1.t2      .         .        +INF       .         
+j3.p1.t3      .         .        +INF       .         
+j3.p1.t4      .         .        +INF       .         
+j3.p1.t5      .         .        +INF       .         
+j3.p1.t6      .         .        +INF       .         
+j3.p1.t7      .         .        +INF       .         
+j3.p1.t8      .         .        +INF       .         
+j3.p1.t9      .         .        +INF       .         
+j3.p2.t1      .         .        +INF       .         
+j3.p2.t2      .         .        +INF       .         
+j3.p2.t3      .         .        +INF       .         
+j3.p2.t4      .         .        +INF       .         
+j3.p2.t5      .         .        +INF       .         
+j3.p2.t6      .         .        +INF       .         
+j3.p2.t7      .         .        +INF       .         
+j3.p2.t8      .         .        +INF       .         
+j3.p2.t9      .         .        +INF       .         
+j3.p3.t1      .         .        +INF       .         
+j3.p3.t2      .         .        +INF       .         
+j3.p3.t3      .         .        +INF       .         
+j3.p3.t4      .         .        +INF       .         
+j3.p3.t5      .         .        +INF       .         
+j3.p3.t6      .         .        +INF       .         
+j3.p3.t7      .         .        +INF       .         
+j3.p3.t8      .         .        +INF       .         
+j3.p3.t9      .         .        +INF       .         
+j3.p4.t1      .         .        +INF       .         
+j3.p4.t2      .         .        +INF       .         
+j3.p4.t3      .         .        +INF       .         
+j3.p4.t4      .         .        +INF       .         
+j3.p4.t5      .        1.000     +INF       .         
+j3.p4.t6      .         .        +INF       .         
+j3.p4.t7      .         .        +INF       .         
+j3.p4.t8      .         .        +INF       .         
+j3.p4.t9      .         .        +INF       .         
+
+---- EQU Wfunction  
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+j1.p1.t1    -1.000      .        +INF       .         
+j1.p1.t2    -1.000      .        +INF       .         
+j1.p1.t3    -1.000    -0.500     +INF       .         
+j1.p1.t4    -1.000      .        +INF       .         
+j1.p1.t5    -1.000     1.000     +INF       .         
+j1.p1.t6    -1.000    -0.500     +INF       .         
+j1.p1.t7    -1.000      .        +INF       .         
+j1.p1.t8    -1.000      .        +INF       .         
+j1.p1.t9    -1.000      .        +INF       .         
+j1.p2.t1    -1.000    -0.500     +INF       .         
+j1.p2.t2    -1.000      .        +INF       .         
+j1.p2.t3    -1.000      .        +INF       .         
+j1.p2.t4    -1.000      .        +INF       .         
+j1.p2.t5    -1.000      .        +INF       .         
+j1.p2.t6    -1.000      .        +INF       .         
+j1.p2.t7    -1.000    -0.500     +INF       .         
+j1.p2.t8    -1.000      .        +INF       .         
+j1.p2.t9    -1.000      .        +INF       .         
+j1.p3.t1    -1.000      .        +INF       .         
+j1.p3.t2    -1.000      .        +INF       .         
+j1.p3.t3    -1.000      .        +INF       .         
+j1.p3.t4    -1.000      .        +INF       .         
+j1.p3.t5    -1.000    -1.000     +INF       .         
+j1.p3.t6    -1.000      .        +INF       .         
+j1.p3.t7    -1.000      .        +INF       .         
+j1.p3.t8    -1.000      .        +INF       .         
+j1.p3.t9    -1.000    -1.000     +INF       .         
+j1.p4.t1    -1.000    -0.500     +INF       .         
+j1.p4.t2    -1.000      .        +INF       .         
+j1.p4.t3    -1.000      .        +INF       .         
+j1.p4.t4    -1.000      .        +INF       .         
+j1.p4.t5    -1.000      .        +INF       .         
+j1.p4.t6    -1.000      .        +INF       .         
+j1.p4.t7    -1.000      .        +INF       .         
+j1.p4.t8    -1.000      .        +INF       .         
+j1.p4.t9    -1.000      .        +INF       .         
+j2.p1.t1    -1.000      .        +INF       .         
+j2.p1.t2    -1.000      .        +INF       .         
+j2.p1.t3    -1.000    -0.500     +INF       .         
+j2.p1.t4    -1.000      .        +INF       .         
+j2.p1.t5    -1.000      .        +INF       .         
+j2.p1.t6    -1.000    -0.500     +INF       .         
+j2.p1.t7    -1.000      .        +INF       .         
+j2.p1.t8    -1.000      .        +INF       .         
+j2.p1.t9    -1.000      .        +INF       .         
+j2.p2.t1    -1.000    -0.500     +INF       .         
+j2.p2.t2    -1.000      .        +INF       .         
+j2.p2.t3    -1.000      .        +INF       .         
+j2.p2.t4    -1.000      .        +INF       .         
+j2.p2.t5    -1.000      .        +INF       .         
+j2.p2.t6    -1.000      .        +INF       .         
+j2.p2.t7    -1.000    -0.500     +INF       .         
+j2.p2.t8    -1.000      .        +INF       .         
+j2.p2.t9    -1.000      .        +INF       .         
+j2.p3.t1    -1.000      .        +INF       .         
+j2.p3.t2    -1.000      .        +INF       .         
+j2.p3.t3    -1.000      .        +INF       .         
+j2.p3.t4    -1.000      .        +INF       .         
+j2.p3.t5    -1.000    -1.000     +INF       .         
+j2.p3.t6    -1.000      .        +INF       .         
+j2.p3.t7    -1.000      .        +INF       .         
+j2.p3.t8    -1.000      .        +INF       .         
+j2.p3.t9    -1.000    -1.000     +INF       .         
+j2.p4.t1    -1.000    -0.500     +INF       .         
+j2.p4.t2    -1.000      .        +INF       .         
+j2.p4.t3    -1.000      .        +INF       .         
+j2.p4.t4    -1.000      .        +INF       .         
+j2.p4.t5    -1.000      .        +INF       .         
+j2.p4.t6    -1.000      .        +INF       .         
+j2.p4.t7    -1.000      .        +INF       .         
+j2.p4.t8    -1.000      .        +INF       .         
+j2.p4.t9    -1.000      .        +INF       .         
+j3.p1.t1    -1.000      .        +INF       .         
+j3.p1.t2    -1.000      .        +INF       .         
+j3.p1.t3    -1.000    -0.500     +INF       .         
+j3.p1.t4    -1.000      .        +INF       .         
+j3.p1.t5    -1.000      .        +INF       .         
+j3.p1.t6    -1.000    -0.500     +INF       .         
+j3.p1.t7    -1.000      .        +INF       .         
+j3.p1.t8    -1.000      .        +INF       .         
+j3.p1.t9    -1.000      .        +INF       .         
+j3.p2.t1    -1.000    -0.500     +INF       .         
+j3.p2.t2    -1.000      .        +INF       .         
+j3.p2.t3    -1.000      .        +INF       .         
+j3.p2.t4    -1.000      .        +INF       .         
+j3.p2.t5    -1.000      .        +INF       .         
+j3.p2.t6    -1.000      .        +INF       .         
+j3.p2.t7    -1.000    -0.500     +INF       .         
+j3.p2.t8    -1.000      .        +INF       .         
+j3.p2.t9    -1.000      .        +INF       .         
+j3.p3.t1    -1.000      .        +INF       .         
+j3.p3.t2    -1.000      .        +INF       .         
+j3.p3.t3    -1.000      .        +INF       .         
+j3.p3.t4    -1.000      .        +INF       .         
+j3.p3.t5    -1.000    -1.000     +INF       .         
+j3.p3.t6    -1.000     1.000     +INF       .         
+j3.p3.t7    -1.000     1.000     +INF       .         
+j3.p3.t8    -1.000     1.000     +INF       .         
+j3.p3.t9    -1.000    -1.000     +INF       .         
+j3.p4.t1    -1.000    -0.500     +INF       .         
+j3.p4.t2    -1.000      .        +INF       .         
+j3.p4.t3    -1.000      .        +INF       .         
+j3.p4.t4    -1.000      .        +INF       .         
+j3.p4.t5    -1.000      .        +INF       .         
+j3.p4.t6    -1.000      .        +INF       .         
+j3.p4.t7    -1.000      .        +INF       .         
+j3.p4.t8    -1.000      .        +INF       .         
+j3.p4.t9    -1.000      .        +INF       .         
+
+---- EQU Yfunction  
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+i1.t1     -INF      1.000     1.000      .         
+i1.t2     -INF      1.000     1.000      .         
+i1.t3     -INF      1.000     1.000      .         
+i1.t4     -INF      1.000     1.000      .         
+i1.t5     -INF      1.000     1.000      .         
+i1.t6     -INF      1.000     1.000      .         
+i1.t7     -INF      1.000     1.000      .         
+i1.t8     -INF      1.000     1.000      .         
+i1.t9     -INF      1.000     1.000      .         
+i2.t1     -INF      1.000     1.000      .         
+i2.t2     -INF      1.000     1.000      .         
+i2.t3     -INF      1.000     1.000      .         
+i2.t4     -INF      1.000     1.000      .         
+i2.t5     -INF      1.000     1.000      .         
+i2.t6     -INF      1.000     1.000      .         
+i2.t7     -INF      1.000     1.000      .         
+i2.t8     -INF      1.000     1.000      .         
+i2.t9     -INF      1.000     1.000      .         
+
+---- EQU Ufunction  
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+j1.t1     -INF       .        1.000      .         
+j1.t2     -INF       .        1.000      .         
+j1.t3     -INF      1.000     1.000      .         
+j1.t4     -INF      1.000     1.000      .         
+j1.t5     -INF      1.000     1.000      .         
+j1.t6     -INF      1.000     1.000      .         
+j1.t7     -INF      1.000     1.000      .         
+j1.t8     -INF      1.000     1.000      .         
+j1.t9     -INF       .        1.000      .         
+j2.t1     -INF      1.000     1.000      .         
+j2.t2     -INF      1.000     1.000      .         
+j2.t3     -INF       .        1.000      .         
+j2.t4     -INF      1.000     1.000      .         
+j2.t5     -INF      1.000     1.000      .         
+j2.t6     -INF      1.000     1.000      .         
+j2.t7     -INF      1.000     1.000      .         
+j2.t8     -INF      1.000     1.000      .         
+j2.t9     -INF      1.000     1.000      .         
+j3.t1     -INF      1.000     1.000      .         
+j3.t2     -INF      1.000     1.000      .         
+j3.t3     -INF      1.000     1.000      .         
+j3.t4     -INF      1.000     1.000      .         
+j3.t5     -INF      1.000     1.000      .         
+j3.t6     -INF      1.000     1.000      .         
+j3.t7     -INF      1.000     1.000      .         
+j3.t8     -INF      1.000     1.000      .         
+j3.t9     -INF      1.000     1.000      .         
+
+---- EQU USP_minTiming  
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+i1.p1.t1     -INF       .         .         .         
+i1.p1.t2     -INF       .         .         .         
+i1.p1.t3     -INF    -30.000      .         .         
+i1.p1.t4     -INF    -40.000      .         .         
+i1.p1.t5     -INF       .         .         .         
+i1.p1.t6     -INF       .         .         .         
+i1.p1.t7     -INF       .         .         .         
+i1.p1.t8     -INF       .         .         .         
+i1.p1.t9     -INF       .         .         .         
+i1.p2.t1     -INF    -33.222      .         .         
+i1.p2.t2     -INF    -23.444      .         .         
+i1.p2.t3     -INF       .         .         .         
+i1.p2.t4     -INF       .         .         .         
+i1.p2.t5     -INF       .         .         .         
+i1.p2.t6     -INF       .         .         .         
+i1.p2.t7     -INF    -33.222      .         .         
+i1.p2.t8     -INF    -23.444      .         .         
+i1.p2.t9     -INF       .         .         .         
+i1.p3.t1     -INF       .         .         .         
+i1.p3.t2     -INF       .         .         .         
+i1.p3.t3     -INF       .         .         .         
+i1.p3.t4     -INF       .         .         .         
+i1.p3.t5     -INF    -47.500      .         .         
+i1.p3.t6     -INF    -37.500      .         .         
+i1.p3.t7     -INF       .         .         .         
+i1.p3.t8     -INF       .         .         .         
+i1.p3.t9     -INF    -47.500      .         .         
+i1.p4.t1     -INF       .         .         .         
+i1.p4.t2     -INF       .         .         .         
+i1.p4.t3     -INF       .         .         .         
+i1.p4.t4     -INF       .         .         .         
+i1.p4.t5     -INF       .         .         .         
+i1.p4.t6     -INF       .         .         .         
+i1.p4.t7     -INF       .         .         .         
+i1.p4.t8     -INF       .         .         .         
+i1.p4.t9     -INF       .         .         .         
+i2.p1.t1     -INF       .         .         .         
+i2.p1.t2     -INF       .         .         .         
+i2.p1.t3     -INF       .         .         .         
+i2.p1.t4     -INF       .         .         .         
+i2.p1.t5     -INF       .         .         .         
+i2.p1.t6     -INF    -30.000      .         .         
+i2.p1.t7     -INF    -40.000      .         .         
+i2.p1.t8     -INF    -40.000      .         .         
+i2.p1.t9     -INF       .         .         .         
+i2.p2.t1     -INF       .         .         .         
+i2.p2.t2     -INF       .         .         .         
+i2.p2.t3     -INF       .         .         .         
+i2.p2.t4     -INF       .         .         .         
+i2.p2.t5     -INF       .         .         .         
+i2.p2.t6     -INF       .         .         .         
+i2.p2.t7     -INF       .         .         .         
+i2.p2.t8     -INF       .         .         .         
+i2.p2.t9     -INF       .         .         .         
+i2.p3.t1     -INF       .         .         .         
+i2.p3.t2     -INF       .         .         .         
+i2.p3.t3     -INF       .         .         .         
+i2.p3.t4     -INF       .         .         .         
+i2.p3.t5     -INF    -47.500      .         .         
+i2.p3.t6     -INF       .         .         .         
+i2.p3.t7     -INF       .         .         .         
+i2.p3.t8     -INF       .         .         .         
+i2.p3.t9     -INF    -47.500      .         .         
+i2.p4.t1     -INF    -22.500      .         .         
+i2.p4.t2     -INF    -37.500      .         .         
+i2.p4.t3     -INF    -37.500      .         .         
+i2.p4.t4     -INF    -37.500      .         .         
+i2.p4.t5     -INF       .         .         .         
+i2.p4.t6     -INF       .         .         .         
+i2.p4.t7     -INF       .         .         .         
+i2.p4.t8     -INF       .         .         .         
+i2.p4.t9     -INF       .         .         .         
+
+---- EQU USP_maxTiming  
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+i1.p1.t1      .         .        +INF       .         
+i1.p1.t2      .         .        +INF       .         
+i1.p1.t3      .       10.000     +INF       .         
+i1.p1.t4      .         .        +INF       .         
+i1.p1.t5      .         .        +INF       .         
+i1.p1.t6      .         .        +INF       .         
+i1.p1.t7      .         .        +INF       .         
+i1.p1.t8      .         .        +INF       .         
+i1.p1.t9      .         .        +INF       .         
+i1.p2.t1      .        5.778     +INF       .         
+i1.p2.t2      .       15.556     +INF       .         
+i1.p2.t3      .         .        +INF       .         
+i1.p2.t4      .         .        +INF       .         
+i1.p2.t5      .         .        +INF       .         
+i1.p2.t6      .         .        +INF       .         
+i1.p2.t7      .        5.778     +INF       .         
+i1.p2.t8      .       15.556     +INF       .         
+i1.p2.t9      .         .        +INF       .         
+i1.p3.t1      .         .        +INF       .         
+i1.p3.t2      .         .        +INF       .         
+i1.p3.t3      .         .        +INF       .         
+i1.p3.t4      .         .        +INF       .         
+i1.p3.t5      .         .        +INF       .         
+i1.p3.t6      .       10.000     +INF       .         
+i1.p3.t7      .         .        +INF       .         
+i1.p3.t8      .         .        +INF       .         
+i1.p3.t9      .         .        +INF       .         
+i1.p4.t1      .         .        +INF       .         
+i1.p4.t2      .         .        +INF       .         
+i1.p4.t3      .         .        +INF       .         
+i1.p4.t4      .         .        +INF       .         
+i1.p4.t5      .         .        +INF       .         
+i1.p4.t6      .         .        +INF       .         
+i1.p4.t7      .         .        +INF       .         
+i1.p4.t8      .         .        +INF       .         
+i1.p4.t9      .         .        +INF       .         
+i2.p1.t1      .         .        +INF       .         
+i2.p1.t2      .         .        +INF       .         
+i2.p1.t3      .         .        +INF       .         
+i2.p1.t4      .         .        +INF       .         
+i2.p1.t5      .         .        +INF       .         
+i2.p1.t6      .       10.000     +INF       .         
+i2.p1.t7      .         .        +INF       .         
+i2.p1.t8      .         .        +INF       .         
+i2.p1.t9      .         .        +INF       .         
+i2.p2.t1      .         .        +INF       .         
+i2.p2.t2      .         .        +INF       .         
+i2.p2.t3      .         .        +INF       .         
+i2.p2.t4      .         .        +INF       .         
+i2.p2.t5      .         .        +INF       .         
+i2.p2.t6      .         .        +INF       .         
+i2.p2.t7      .         .        +INF       .         
+i2.p2.t8      .         .        +INF       .         
+i2.p2.t9      .         .        +INF       .         
+i2.p3.t1      .         .        +INF       .         
+i2.p3.t2      .         .        +INF       .         
+i2.p3.t3      .         .        +INF       .         
+i2.p3.t4      .         .        +INF       .         
+i2.p3.t5      .         .        +INF       .         
+i2.p3.t6      .         .        +INF       .         
+i2.p3.t7      .         .        +INF       .         
+i2.p3.t8      .         .        +INF       .         
+i2.p3.t9      .         .        +INF       .         
+i2.p4.t1      .       25.000     +INF       .         
+i2.p4.t2      .       10.000     +INF       .         
+i2.p4.t3      .       10.000     +INF       .         
+i2.p4.t4      .       10.000     +INF       .         
+i2.p4.t5      .         .        +INF       .         
+i2.p4.t6      .         .        +INF       .         
+i2.p4.t7      .         .        +INF       .         
+i2.p4.t8      .         .        +INF       .         
+i2.p4.t9      .         .        +INF       .         
+
+---- EQU DSP_minTiming  
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+j1.p1.t1     -INF       .         .         .         
+j1.p1.t2     -INF       .         .         .         
+j1.p1.t3     -INF    -40.000      .         .         
+j1.p1.t4     -INF    -20.000      .         .         
+j1.p1.t5     -INF    -20.000      .         .         
+j1.p1.t6     -INF    -10.000      .         .         
+j1.p1.t7     -INF    -20.000      .         .         
+j1.p1.t8     -INF    -20.000      .         .         
+j1.p1.t9     -INF       .         .         .         
+j1.p2.t1     -INF       .         .         .         
+j1.p2.t2     -INF       .         .         .         
+j1.p2.t3     -INF       .         .         .         
+j1.p2.t4     -INF       .         .         .         
+j1.p2.t5     -INF       .         .         .         
+j1.p2.t6     -INF       .         .         .         
+j1.p2.t7     -INF       .         .         .         
+j1.p2.t8     -INF       .         .         .         
+j1.p2.t9     -INF       .         .         .         
+j1.p3.t1     -INF       .         .         .         
+j1.p3.t2     -INF       .         .         .         
+j1.p3.t3     -INF       .         .         .         
+j1.p3.t4     -INF       .         .         .         
+j1.p3.t5     -INF       .         .         .         
+j1.p3.t6     -INF       .         .         .         
+j1.p3.t7     -INF       .         .         .         
+j1.p3.t8     -INF       .         .         .         
+j1.p3.t9     -INF       .         .         .         
+j1.p4.t1     -INF       .         .         .         
+j1.p4.t2     -INF       .         .         .         
+j1.p4.t3     -INF       .         .         .         
+j1.p4.t4     -INF       .         .         .         
+j1.p4.t5     -INF       .         .         .         
+j1.p4.t6     -INF       .         .         .         
+j1.p4.t7     -INF       .         .         .         
+j1.p4.t8     -INF       .         .         .         
+j1.p4.t9     -INF       .         .         .         
+j2.p1.t1     -INF       .         .         .         
+j2.p1.t2     -INF       .         .         .         
+j2.p1.t3     -INF       .         .         .         
+j2.p1.t4     -INF       .         .         .         
+j2.p1.t5     -INF       .         .         .         
+j2.p1.t6     -INF       .         .         .         
+j2.p1.t7     -INF       .         .         .         
+j2.p1.t8     -INF       .         .         .         
+j2.p1.t9     -INF       .         .         .         
+j2.p2.t1     -INF    -42.000      .         .         
+j2.p2.t2     -INF    -10.000      .         .         
+j2.p2.t3     -INF       .         .         .         
+j2.p2.t4     -INF       .         .         .         
+j2.p2.t5     -INF       .         .         .         
+j2.p2.t6     -INF       .         .         .         
+j2.p2.t7     -INF    -42.000      .         .         
+j2.p2.t8     -INF    -10.000      .         .         
+j2.p2.t9     -INF       .         .         .         
+j2.p3.t1     -INF       .         .         .         
+j2.p3.t2     -INF       .         .         .         
+j2.p3.t3     -INF       .         .         .         
+j2.p3.t4     -INF    -24.500      .         .         
+j2.p3.t5     -INF    -50.000      .         .         
+j2.p3.t6     -INF    -30.000      .         .         
+j2.p3.t7     -INF       .         .         .         
+j2.p3.t8     -INF       .         .         .         
+j2.p3.t9     -INF    -44.500      .         .         
+j2.p4.t1     -INF       .         .         .         
+j2.p4.t2     -INF       .         .         .         
+j2.p4.t3     -INF       .         .         .         
+j2.p4.t4     -INF       .         .         .         
+j2.p4.t5     -INF       .         .         .         
+j2.p4.t6     -INF       .         .         .         
+j2.p4.t7     -INF       .         .         .         
+j2.p4.t8     -INF       .         .         .         
+j2.p4.t9     -INF       .         .         .         
+j3.p1.t1     -INF       .         .         .         
+j3.p1.t2     -INF       .         .         .         
+j3.p1.t3     -INF       .         .         .         
+j3.p1.t4     -INF       .         .         .         
+j3.p1.t5     -INF       .         .         .         
+j3.p1.t6     -INF       .         .         .         
+j3.p1.t7     -INF       .         .         .         
+j3.p1.t8     -INF       .         .         .         
+j3.p1.t9     -INF       .         .         .         
+j3.p2.t1     -INF       .         .         .         
+j3.p2.t2     -INF       .         .         .         
+j3.p2.t3     -INF       .         .         .         
+j3.p2.t4     -INF       .         .         .         
+j3.p2.t5     -INF       .         .         .         
+j3.p2.t6     -INF       .         .         .         
+j3.p2.t7     -INF       .         .         .         
+j3.p2.t8     -INF       .         .         .         
+j3.p2.t9     -INF       .         .         .         
+j3.p3.t1     -INF       .         .         .         
+j3.p3.t2     -INF       .         .         .         
+j3.p3.t3     -INF       .         .         .         
+j3.p3.t4     -INF       .         .         .         
+j3.p3.t5     -INF    -44.500      .         .         
+j3.p3.t6     -INF    -24.500      .         .         
+j3.p3.t7     -INF    -24.500      .         .         
+j3.p3.t8     -INF    -24.500      .         .         
+j3.p3.t9     -INF    -50.000      .         .         
+j3.p4.t1     -INF    -44.500      .         .         
+j3.p4.t2     -INF    -30.000      .         .         
+j3.p4.t3     -INF    -30.000      .         .         
+j3.p4.t4     -INF    -30.000      .         .         
+j3.p4.t5     -INF       .         .         .         
+j3.p4.t6     -INF       .         .         .         
+j3.p4.t7     -INF       .         .         .         
+j3.p4.t8     -INF       .         .         .         
+j3.p4.t9     -INF       .         .         .         
+
+---- EQU DSP_maxTiming  
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+j1.p1.t1      .         .        +INF       .         
+j1.p1.t2      .         .        +INF       .         
+j1.p1.t3      .       10.000     +INF       .         
+j1.p1.t4      .       30.000     +INF       .         
+j1.p1.t5      .       30.000     +INF       .         
+j1.p1.t6      .       40.000     +INF       .         
+j1.p1.t7      .       30.000     +INF       .         
+j1.p1.t8      .       30.000     +INF       .         
+j1.p1.t9      .         .        +INF       .         
+j1.p2.t1      .         .        +INF       .         
+j1.p2.t2      .         .        +INF       .         
+j1.p2.t3      .         .        +INF       .         
+j1.p2.t4      .         .        +INF       .         
+j1.p2.t5      .         .        +INF       .         
+j1.p2.t6      .         .        +INF       .         
+j1.p2.t7      .         .        +INF       .         
+j1.p2.t8      .         .        +INF       .         
+j1.p2.t9      .         .        +INF       .         
+j1.p3.t1      .         .        +INF       .         
+j1.p3.t2      .         .        +INF       .         
+j1.p3.t3      .         .        +INF       .         
+j1.p3.t4      .         .        +INF       .         
+j1.p3.t5      .         .        +INF       .         
+j1.p3.t6      .         .        +INF       .         
+j1.p3.t7      .         .        +INF       .         
+j1.p3.t8      .         .        +INF       .         
+j1.p3.t9      .         .        +INF       .         
+j1.p4.t1      .         .        +INF       .         
+j1.p4.t2      .         .        +INF       .         
+j1.p4.t3      .         .        +INF       .         
+j1.p4.t4      .         .        +INF       .         
+j1.p4.t5      .         .        +INF       .         
+j1.p4.t6      .         .        +INF       .         
+j1.p4.t7      .         .        +INF       .         
+j1.p4.t8      .         .        +INF       .         
+j1.p4.t9      .         .        +INF       .         
+j2.p1.t1      .         .        +INF       .         
+j2.p1.t2      .         .        +INF       .         
+j2.p1.t3      .         .        +INF       .         
+j2.p1.t4      .         .        +INF       .         
+j2.p1.t5      .         .        +INF       .         
+j2.p1.t6      .         .        +INF       .         
+j2.p1.t7      .         .        +INF       .         
+j2.p1.t8      .         .        +INF       .         
+j2.p1.t9      .         .        +INF       .         
+j2.p2.t1      .        8.000     +INF       .         
+j2.p2.t2      .       40.000     +INF       .         
+j2.p2.t3      .         .        +INF       .         
+j2.p2.t4      .         .        +INF       .         
+j2.p2.t5      .         .        +INF       .         
+j2.p2.t6      .         .        +INF       .         
+j2.p2.t7      .        8.000     +INF       .         
+j2.p2.t8      .       40.000     +INF       .         
+j2.p2.t9      .         .        +INF       .         
+j2.p3.t1      .         .        +INF       .         
+j2.p3.t2      .         .        +INF       .         
+j2.p3.t3      .         .        +INF       .         
+j2.p3.t4      .       25.500     +INF       .         
+j2.p3.t5      .         .        +INF       .         
+j2.p3.t6      .       20.000     +INF       .         
+j2.p3.t7      .         .        +INF       .         
+j2.p3.t8      .         .        +INF       .         
+j2.p3.t9      .        5.500     +INF       .         
+j2.p4.t1      .         .        +INF       .         
+j2.p4.t2      .         .        +INF       .         
+j2.p4.t3      .         .        +INF       .         
+j2.p4.t4      .         .        +INF       .         
+j2.p4.t5      .         .        +INF       .         
+j2.p4.t6      .         .        +INF       .         
+j2.p4.t7      .         .        +INF       .         
+j2.p4.t8      .         .        +INF       .         
+j2.p4.t9      .         .        +INF       .         
+j3.p1.t1      .         .        +INF       .         
+j3.p1.t2      .         .        +INF       .         
+j3.p1.t3      .         .        +INF       .         
+j3.p1.t4      .         .        +INF       .         
+j3.p1.t5      .         .        +INF       .         
+j3.p1.t6      .         .        +INF       .         
+j3.p1.t7      .         .        +INF       .         
+j3.p1.t8      .         .        +INF       .         
+j3.p1.t9      .         .        +INF       .         
+j3.p2.t1      .         .        +INF       .         
+j3.p2.t2      .         .        +INF       .         
+j3.p2.t3      .         .        +INF       .         
+j3.p2.t4      .         .        +INF       .         
+j3.p2.t5      .         .        +INF       .         
+j3.p2.t6      .         .        +INF       .         
+j3.p2.t7      .         .        +INF       .         
+j3.p2.t8      .         .        +INF       .         
+j3.p2.t9      .         .        +INF       .         
+j3.p3.t1      .         .        +INF       .         
+j3.p3.t2      .         .        +INF       .         
+j3.p3.t3      .         .        +INF       .         
+j3.p3.t4      .         .        +INF       .         
+j3.p3.t5      .        5.500     +INF       .         
+j3.p3.t6      .       25.500     +INF       .         
+j3.p3.t7      .       25.500     +INF       .         
+j3.p3.t8      .       25.500     +INF       .         
+j3.p3.t9      .         .        +INF       .         
+j3.p4.t1      .        5.500     +INF       .         
+j3.p4.t2      .       20.000     +INF       .         
+j3.p4.t3      .       20.000     +INF       .         
+j3.p4.t4      .       20.000     +INF       .         
+j3.p4.t5      .         .        +INF       .         
+j3.p4.t6      .         .        +INF       .         
+j3.p4.t7      .         .        +INF       .         
+j3.p4.t8      .         .        +INF       .         
+j3.p4.t9      .         .        +INF       .         
+
+---- EQU USP_TotalTime  
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+i1.t1      .         .         .         EPS       
+i1.t2      .         .         .         EPS       
+i1.t3      .         .         .         EPS       
+i1.t4      .         .         .         EPS       
+i1.t5      .         .         .         EPS       
+i1.t6      .         .         .         EPS       
+i1.t7      .         .         .         EPS       
+i1.t8      .         .         .         EPS       
+i1.t9      .         .         .         EPS       
+i2.t1      .         .         .         EPS       
+i2.t2      .         .         .         EPS       
+i2.t3      .         .         .         EPS       
+i2.t4      .         .         .         EPS       
+i2.t5      .         .         .         EPS       
+i2.t6      .         .         .         EPS       
+i2.t7      .         .         .         EPS       
+i2.t8      .         .         .         EPS       
+i2.t9      .         .         .         EPS       
+
+---- EQU DSP_TotalTime  
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+j1.t1      .         .         .         .         
+j1.t2      .         .         .         .         
+j1.t3      .         .         .         EPS       
+j1.t4      .         .         .         EPS       
+j1.t5      .         .         .         EPS       
+j1.t6      .         .         .         EPS       
+j1.t7      .         .         .         EPS       
+j1.t8      .         .         .         EPS       
+j1.t9      .         .         .         .         
+j2.t1      .         .         .         EPS       
+j2.t2      .         .         .         EPS       
+j2.t3      .         .         .         .         
+j2.t4      .         .         .         EPS       
+j2.t5      .         .         .         EPS       
+j2.t6      .         .         .         EPS       
+j2.t7      .         .         .         EPS       
+j2.t8      .         .         .         EPS       
+j2.t9      .         .         .         EPS       
+j3.t1      .         .         .         EPS       
+j3.t2      .         .         .         EPS       
+j3.t3      .         .         .         EPS       
+j3.t4      .         .         .         EPS       
+j3.t5      .         .         .         EPS       
+j3.t6      .         .         .         EPS       
+j3.t7      .         .         .         EPS       
+j3.t8      .         .         .         EPS       
+j3.t9      .         .         .         EPS       
+
+---- EQU USP_H  
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+i1.t1     -INF     54.222    60.000      .         
+i1.t2     -INF     44.444    60.000      .         
+i1.t3     -INF     50.000    60.000      .         
+i1.t4     -INF     60.000    60.000      .         
+i1.t5     -INF     60.000    60.000      .         
+i1.t6     -INF     50.000    60.000      .         
+i1.t7     -INF     54.222    60.000      .         
+i1.t8     -INF     44.444    60.000      .         
+i1.t9     -INF     60.000    60.000      .         
+i2.t1     -INF     35.000    60.000      .         
+i2.t2     -INF     50.000    60.000      .         
+i2.t3     -INF     50.000    60.000      .         
+i2.t4     -INF     50.000    60.000      .         
+i2.t5     -INF     60.000    60.000      .         
+i2.t6     -INF     50.000    60.000      .         
+i2.t7     -INF     60.000    60.000      .         
+i2.t8     -INF     60.000    60.000      .         
+i2.t9     -INF     60.000    60.000      .         
+
+---- EQU DSP_H  
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+j1.t1     -INF       .       60.000      .         
+j1.t2     -INF       .       60.000      .         
+j1.t3     -INF     50.000    60.000      .         
+j1.t4     -INF     30.000    60.000      .         
+j1.t5     -INF     30.000    60.000      .         
+j1.t6     -INF     20.000    60.000      .         
+j1.t7     -INF     30.000    60.000      .         
+j1.t8     -INF     30.000    60.000      .         
+j1.t9     -INF       .       60.000      .         
+j2.t1     -INF     52.000    60.000      .         
+j2.t2     -INF     20.000    60.000      .         
+j2.t3     -INF       .       60.000      .         
+j2.t4     -INF     34.500    60.000      .         
+j2.t5     -INF     60.000    60.000      .         
+j2.t6     -INF     40.000    60.000      .         
+j2.t7     -INF     52.000    60.000      .         
+j2.t8     -INF     20.000    60.000      .         
+j2.t9     -INF     54.500    60.000      .         
+j3.t1     -INF     54.500    60.000      .         
+j3.t2     -INF     40.000    60.000      .         
+j3.t3     -INF     40.000    60.000      .         
+j3.t4     -INF     40.000    60.000      .         
+j3.t5     -INF     54.500    60.000      .         
+j3.t6     -INF     34.500    60.000      .         
+j3.t7     -INF     34.500    60.000      .         
+j3.t8     -INF     34.500    60.000      .         
+j3.t9     -INF     60.000    60.000      .         
+
+---- EQU CrudeStorage  
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+p1.t1      .         .         .         .         
+p1.t2      .         .         .         .         
+p1.t3      .         .         .         .         
+p1.t4      .         .         .         .         
+p1.t5      .         .         .         .         
+p1.t6      .         .         .         .         
+p1.t7      .         .         .         .         
+p1.t8      .         .         .         .         
+p1.t9      .         .         .         .         
+p2.t1      .         .         .         .         
+p2.t2      .         .         .         .         
+p2.t3      .         .         .         .         
+p2.t4      .         .         .         .         
+p2.t5      .         .         .         .         
+p2.t6      .         .         .         .         
+p2.t7      .         .         .         .         
+p2.t8      .         .         .         .         
+p2.t9      .         .         .         .         
+p3.t1      .         .         .         .         
+p3.t2      .         .         .         .         
+p3.t3      .         .         .         .         
+p3.t4      .         .         .         .         
+p3.t5      .         .         .         .         
+p3.t6      .         .         .         .         
+p3.t7      .         .         .         .         
+p3.t8      .         .         .         .         
+p3.t9      .         .         .         .         
+p4.t1      .         .         .         .         
+p4.t2      .         .         .         .         
+p4.t3      .         .         .         .         
+p4.t4      .         .         .         .         
+p4.t5      .         .         .         .         
+p4.t6      .         .         .         .         
+p4.t7      .         .         .         .         
+p4.t8      .         .         .         .         
+p4.t9      .         .         .         .         
+
+---- EQU FinalStorage  
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+p1.t1      .         .         .      100.000      
+p1.t2      .         .         .      101.000      
+p1.t3      .         .         .      102.000      
+p1.t4      .         .         .      103.000      
+p1.t5      .         .         .      104.000      
+p1.t6      .         .         .       63.000      
+p1.t7      .         .         .       43.000      
+p1.t8      .         .         .       44.000      
+p1.t9      .         .         .       45.000      
+p2.t1      .         .         .       -2.000      
+p2.t2      .         .         .       -1.000      
+p2.t3      .         .         .         .         
+p2.t4      .         .         .       80.000      
+p2.t5      .         .         .       18.000      
+p2.t6      .         .         .       19.000      
+p2.t7      .         .         .       20.000      
+p2.t8      .         .         .         EPS       
+p2.t9      .         .         .         .         
+p3.t1      .         .         .       33.000      
+p3.t2      .         .         .       34.000      
+p3.t3      .         .         .       35.000      
+p3.t4      .         .         .       36.000      
+p3.t5      .         .         .       37.000      
+p3.t6      .         .         .       17.000      
+p3.t7      .         .         .       18.000      
+p3.t8      .         .         .       19.000      
+p3.t9      .         .         .       20.000      
+p4.t1      .         .         .       -1.000      
+p4.t2      .         .         .         .         
+p4.t3      .         .         .        1.000      
+p4.t4      .         .         .        2.000      
+p4.t5      .         .         .       -1.000      
+p4.t6      .         .         .         .         
+p4.t7      .         .         .        1.000      
+p4.t8      .         .         .         .         
+p4.t9      .         .         .        1.000      
+
+---- EQU CrudeCapacity  
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+p1.t1     -INF       .       10.000      .         
+p1.t2     -INF       .       10.000      .         
+p1.t3     -INF       .       10.000      .         
+p1.t4     -INF       .       10.000      .         
+p1.t5     -INF       .       10.000      .         
+p1.t6     -INF       .       10.000      .         
+p1.t7     -INF       .       10.000      .         
+p1.t8     -INF       .       10.000      .         
+p1.t9     -INF       .       10.000      .         
+p2.t1     -INF       .       10.000      .         
+p2.t2     -INF       .       10.000      .         
+p2.t3     -INF       .       10.000      .         
+p2.t4     -INF       .       10.000      .         
+p2.t5     -INF       .       10.000      .         
+p2.t6     -INF       .       10.000      .         
+p2.t7     -INF       .       10.000      .         
+p2.t8     -INF       .       10.000      .         
+p2.t9     -INF       .       10.000      .         
+p3.t1     -INF       .       10.000      .         
+p3.t2     -INF       .       10.000      .         
+p3.t3     -INF       .       10.000      .         
+p3.t4     -INF       .       10.000      .         
+p3.t5     -INF       .       10.000      .         
+p3.t6     -INF       .       10.000      .         
+p3.t7     -INF       .       10.000      .         
+p3.t8     -INF       .       10.000      .         
+p3.t9     -INF       .       10.000      .         
+p4.t1     -INF       .       10.000      .         
+p4.t2     -INF       .       10.000      .         
+p4.t3     -INF       .       10.000      .         
+p4.t4     -INF       .       10.000      .         
+p4.t5     -INF       .       10.000      .         
+p4.t6     -INF       .       10.000      .         
+p4.t7     -INF       .       10.000      .         
+p4.t8     -INF       .       10.000      .         
+p4.t9     -INF       .       10.000      .         
+
+---- EQU FinalCapacity  
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+p1.t1     -INF       .       40.000      .         
+p1.t2     -INF       .       40.000      .         
+p1.t3     -INF      2.000    40.000      .         
+p1.t4     -INF       .       40.000      .         
+p1.t5     -INF       .       40.000      .         
+p1.t6     -INF       .       40.000      .         
+p1.t7     -INF       .       40.000      .         
+p1.t8     -INF      3.000    40.000      .         
+p1.t9     -INF       .       40.000      .         
+p2.t1     -INF      2.000    40.000      .         
+p2.t2     -INF       .       40.000      .         
+p2.t3     -INF       .       40.000      .         
+p2.t4     -INF       .       40.000      .         
+p2.t5     -INF       .       40.000      .         
+p2.t6     -INF       .       40.000      .         
+p2.t7     -INF       .       40.000      .         
+p2.t8     -INF       .       40.000      .         
+p2.t9     -INF       .       40.000      .         
+p3.t1     -INF       .       40.000      .         
+p3.t2     -INF       .       40.000      .         
+p3.t3     -INF       .       40.000      .         
+p3.t4     -INF       .       40.000      .         
+p3.t5     -INF       .       40.000      .         
+p3.t6     -INF      2.000    40.000      .         
+p3.t7     -INF      2.000    40.000      .         
+p3.t8     -INF      2.000    40.000      .         
+p3.t9     -INF       .       40.000      .         
+p4.t1     -INF      2.000    40.000      .         
+p4.t2     -INF       .       40.000      .         
+p4.t3     -INF      4.000    40.000      .         
+p4.t4     -INF       .       40.000      .         
+p4.t5     -INF       .       40.000      .         
+p4.t6     -INF       .       40.000      .         
+p4.t7     -INF       .       40.000      .         
+p4.t8     -INF       .       40.000      .         
+p4.t9     -INF       .       40.000      .         
+
+---- EQU CrudeLimit  
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+p1.t1     -INF       .         .         .         
+p1.t2     -INF     -2.000      .         .         
+p1.t3     -INF     -3.000      .         .         
+p1.t4     -INF       .         .         .         
+p1.t5     -INF     -2.000      .         .         
+p1.t6     -INF     -3.000      .         .         
+p1.t7     -INF     -3.000      .         .         
+p1.t8     -INF       .         .         .         
+p1.t9     -INF       .         .         .         
+p2.t1     -INF     -2.000      .         .         
+p2.t2     -INF       .         .         .         
+p2.t3     -INF       .         .         .         
+p2.t4     -INF       .         .         .         
+p2.t5     -INF       .         .         .         
+p2.t6     -INF     -2.000      .         .         
+p2.t7     -INF     -2.000      .         .         
+p2.t8     -INF       .         .         .         
+p2.t9     -INF       .         .         .         
+p3.t1     -INF       .         .         .         
+p3.t2     -INF       .         .         .         
+p3.t3     -INF       .         .         .         
+p3.t4     -INF     -8.000      .         .         
+p3.t5     -INF     -4.000      .         .         
+p3.t6     -INF       .         .         .         
+p3.t7     -INF       .         .         .         
+p3.t8     -INF     -8.000      .         .         
+p3.t9     -INF       .         .         .         
+p4.t1     -INF     -4.000      .         .         
+p4.t2     -INF     -4.000      .         .         
+p4.t3     -INF     -4.000      .         .         
+p4.t4     -INF       .         .         .         
+p4.t5     -INF       .         .         .         
+p4.t6     -INF       .         .         .         
+p4.t7     -INF       .         .         .         
+p4.t8     -INF       .         .         .         
+p4.t9     -INF       .         .         .         
+
+---- EQU FinalLimit  
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+p1.t1     -INF     -5.000      .         .         
+p1.t2     -INF     -5.000      .         .         
+p1.t3     -INF     -5.000      .         .         
+p1.t4     -INF     -5.000      .         .         
+p1.t5     -INF     -5.000      .         .         
+p1.t6     -INF     -6.000      .         .         
+p1.t7     -INF     -3.000      .         .         
+p1.t8     -INF       .         .         .         
+p1.t9     -INF       .         .         .         
+p2.t1     -INF     -2.000      .         .         
+p2.t2     -INF       .         .         .         
+p2.t3     -INF       .         .       79.000      
+p2.t4     -INF     -2.000      .         .         
+p2.t5     -INF     -4.000      .         .         
+p2.t6     -INF     -4.000      .         .         
+p2.t7     -INF     -2.000      .         .         
+p2.t8     -INF       .         .         .         
+p2.t9     -INF       .         .         .         
+p3.t1     -INF       .         .         .         
+p3.t2     -INF     -8.000      .         .         
+p3.t3     -INF    -10.000      .         .         
+p3.t4     -INF    -10.000      .         .         
+p3.t5     -INF     -2.000      .         .         
+p3.t6     -INF     -8.000      .         .         
+p3.t7     -INF     -8.000      .         .         
+p3.t8     -INF     -8.000      .         .         
+p3.t9     -INF       .         .         .         
+p4.t1     -INF    -12.000      .         .         
+p4.t2     -INF     -8.000      .         .         
+p4.t3     -INF     -4.000      .         .         
+p4.t4     -INF       .         .         .         
+p4.t5     -INF       .         .         .         
+p4.t6     -INF       .         .         .         
+p4.t7     -INF       .         .         .         
+p4.t8     -INF       .         .         .         
+p4.t9     -INF       .         .         .         
+
+---- EQU del  
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+p1.t1      .         .         .         .         
+p1.t2      .         .         .         .         
+p1.t3      .         .         .         .         
+p1.t4     6.000     6.000     6.000   -78.000      
+p1.t5      .         .         .      -58.000      
+p1.t6     4.000     4.000     4.000   -38.000      
+p1.t7      .         .         .      -18.000      
+p1.t8      .         .         .        2.000      
+p1.t9     4.000     4.000     4.000   -20.000      
+p2.t1      .         .         .       22.000      
+p2.t2     4.000     4.000     4.000    21.000      
+p2.t3      .         .         .       41.000      
+p2.t4      .         .         .       61.000      
+p2.t5      .         .         .       81.000      
+p2.t6      .         .         .      101.000      
+p2.t7     4.000     4.000     4.000      .         
+p2.t8      .         .         .       20.000      
+p2.t9      .         .         .       40.000      
+p3.t1      .         .         .         .         
+p3.t2      .         .         .         .         
+p3.t3      .         .         .         .         
+p3.t4      .         .         .         .         
+p3.t5    10.000    10.000    10.000   -20.000      
+p3.t6      .         .         .         .         
+p3.t7      .         .         .       20.000      
+p3.t8      .         .         .       40.000      
+p3.t9    10.000    10.000    10.000    -3.000      
+p4.t1      .         .         .       18.000      
+p4.t2     6.000     6.000     6.000    17.000      
+p4.t3      .         .         .       37.000      
+p4.t4     8.000     8.000     8.000    15.000      
+p4.t5      .         .         .       35.000      
+p4.t6      .         .         .       55.000      
+p4.t7      .         .         .       75.000      
+p4.t8      .         .         .       95.000      
+p4.t9      .         .         .      115.000      
+
+---- VAR Z  includes upstream lead time alpha(p)
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+i1.p1.t1      .         .        1.000    -1.000      
+i1.p1.t2      .         .        1.000    -1.000      
+i1.p1.t3      .        1.000     1.000    -1.000      
+i1.p1.t4      .         .        1.000    -1.000      
+i1.p1.t5      .         .        1.000    -1.000      
+i1.p1.t6      .         .        1.000    -1.000      
+i1.p1.t7      .         .        1.000    -1.000      
+i1.p1.t8      .         .        1.000    -1.000      
+i1.p1.t9      .         .        1.000    -1.000      
+i1.p2.t1      .        1.000     1.000    -1.000      
+i1.p2.t2      .         .        1.000    -1.000      
+i1.p2.t3      .         .        1.000    -1.000      
+i1.p2.t4      .         .        1.000    -1.000      
+i1.p2.t5      .         .        1.000    -1.000      
+i1.p2.t6      .         .        1.000    -1.000      
+i1.p2.t7      .        1.000     1.000    -1.000      
+i1.p2.t8      .         .        1.000    -1.000      
+i1.p2.t9      .         .        1.000    -1.000      
+i1.p3.t1      .         .        1.000    -1.000      
+i1.p3.t2      .         .        1.000    -1.000      
+i1.p3.t3      .         .        1.000    -1.000      
+i1.p3.t4      .         .        1.000    -1.000      
+i1.p3.t5      .        1.000     1.000    -1.000      
+i1.p3.t6      .         .        1.000    -1.000      
+i1.p3.t7      .         .        1.000    -1.000      
+i1.p3.t8      .         .        1.000    -1.000      
+i1.p3.t9      .        1.000     1.000    -1.000      
+i1.p4.t1      .         .        1.000    -1.000      
+i1.p4.t2      .         .        1.000    -1.000      
+i1.p4.t3      .         .        1.000    -1.000      
+i1.p4.t4      .         .        1.000    -1.000      
+i1.p4.t5      .         .        1.000    -1.000      
+i1.p4.t6      .         .        1.000    -1.000      
+i1.p4.t7      .         .        1.000    -1.000      
+i1.p4.t8      .         .        1.000    -1.000      
+i1.p4.t9      .         .        1.000    -1.000      
+i2.p1.t1      .         .        1.000    -1.000      
+i2.p1.t2      .         .        1.000    -1.000      
+i2.p1.t3      .         .        1.000    -1.000      
+i2.p1.t4      .         .        1.000    -1.000      
+i2.p1.t5      .         .        1.000    -1.000      
+i2.p1.t6      .        1.000     1.000    -1.000      
+i2.p1.t7      .         .        1.000    -1.000      
+i2.p1.t8      .         .        1.000    -1.000      
+i2.p1.t9      .         .        1.000    -1.000      
+i2.p2.t1      .         .        1.000    -1.000      
+i2.p2.t2      .         .        1.000    -1.000      
+i2.p2.t3      .         .        1.000    -1.000      
+i2.p2.t4      .         .        1.000    -1.000      
+i2.p2.t5      .         .        1.000    -1.000      
+i2.p2.t6      .         .        1.000    -1.000      
+i2.p2.t7      .         .        1.000    -1.000      
+i2.p2.t8      .         .        1.000    -1.000      
+i2.p2.t9      .         .        1.000    -1.000      
+i2.p3.t1      .         .        1.000    -1.000      
+i2.p3.t2      .         .        1.000    -1.000      
+i2.p3.t3      .         .        1.000    -1.000      
+i2.p3.t4      .         .        1.000    -1.000      
+i2.p3.t5      .        1.000     1.000    -1.000      
+i2.p3.t6      .         .        1.000    -1.000      
+i2.p3.t7      .         .        1.000    -1.000      
+i2.p3.t8      .         .        1.000    -1.000      
+i2.p3.t9      .        1.000     1.000    -1.000      
+i2.p4.t1      .        1.000     1.000    -1.000      
+i2.p4.t2      .         .        1.000    -1.000      
+i2.p4.t3      .         .        1.000    -1.000      
+i2.p4.t4      .         .        1.000    -1.000      
+i2.p4.t5      .         .        1.000    -1.000      
+i2.p4.t6      .         .        1.000    -1.000      
+i2.p4.t7      .         .        1.000    -1.000      
+i2.p4.t8      .         .        1.000    -1.000      
+i2.p4.t9      .         .        1.000    -1.000      
+
+---- VAR W  includes downstream lead time beta(p)
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+j1.p1.t1      .         .        1.000      EPS       
+j1.p1.t2      .         .        1.000      EPS       
+j1.p1.t3      .        1.000     1.000      EPS       
+j1.p1.t4      .         .        1.000      EPS       
+j1.p1.t5      .        1.000     1.000      EPS       
+j1.p1.t6      .         .        1.000      EPS       
+j1.p1.t7      .         .        1.000      EPS       
+j1.p1.t8      .         .        1.000      EPS       
+j1.p1.t9      .         .        1.000      EPS       
+j1.p2.t1      .         .        1.000      EPS       
+j1.p2.t2      .         .        1.000      EPS       
+j1.p2.t3      .         .        1.000      EPS       
+j1.p2.t4      .         .        1.000      EPS       
+j1.p2.t5      .         .        1.000      EPS       
+j1.p2.t6      .         .        1.000      EPS       
+j1.p2.t7      .         .        1.000      EPS       
+j1.p2.t8      .         .        1.000      EPS       
+j1.p2.t9      .         .        1.000      EPS       
+j1.p3.t1      .         .        1.000      EPS       
+j1.p3.t2      .         .        1.000      EPS       
+j1.p3.t3      .         .        1.000      EPS       
+j1.p3.t4      .         .        1.000      EPS       
+j1.p3.t5      .         .        1.000      EPS       
+j1.p3.t6      .         .        1.000      EPS       
+j1.p3.t7      .         .        1.000      EPS       
+j1.p3.t8      .         .        1.000      EPS       
+j1.p3.t9      .         .        1.000      EPS       
+j1.p4.t1      .         .        1.000      EPS       
+j1.p4.t2      .         .        1.000      EPS       
+j1.p4.t3      .         .        1.000      EPS       
+j1.p4.t4      .         .        1.000      EPS       
+j1.p4.t5      .         .        1.000      EPS       
+j1.p4.t6      .         .        1.000      EPS       
+j1.p4.t7      .         .        1.000      EPS       
+j1.p4.t8      .         .        1.000      EPS       
+j1.p4.t9      .         .        1.000      EPS       
+j2.p1.t1      .         .        1.000      EPS       
+j2.p1.t2      .         .        1.000      EPS       
+j2.p1.t3      .         .        1.000      EPS       
+j2.p1.t4      .         .        1.000      EPS       
+j2.p1.t5      .         .        1.000      EPS       
+j2.p1.t6      .         .        1.000      EPS       
+j2.p1.t7      .         .        1.000      EPS       
+j2.p1.t8      .         .        1.000      EPS       
+j2.p1.t9      .         .        1.000      EPS       
+j2.p2.t1      .        1.000     1.000      EPS       
+j2.p2.t2      .         .        1.000      EPS       
+j2.p2.t3      .         .        1.000      EPS       
+j2.p2.t4      .         .        1.000      EPS       
+j2.p2.t5      .         .        1.000      EPS       
+j2.p2.t6      .         .        1.000      EPS       
+j2.p2.t7      .        1.000     1.000      EPS       
+j2.p2.t8      .         .        1.000      EPS       
+j2.p2.t9      .         .        1.000      EPS       
+j2.p3.t1      .         .        1.000      EPS       
+j2.p3.t2      .         .        1.000      EPS       
+j2.p3.t3      .         .        1.000      EPS       
+j2.p3.t4      .        1.000     1.000      EPS       
+j2.p3.t5      .         .        1.000      EPS       
+j2.p3.t6      .         .        1.000      EPS       
+j2.p3.t7      .         .        1.000      EPS       
+j2.p3.t8      .         .        1.000      EPS       
+j2.p3.t9      .        1.000     1.000      EPS       
+j2.p4.t1      .         .        1.000      EPS       
+j2.p4.t2      .         .        1.000      EPS       
+j2.p4.t3      .         .        1.000      EPS       
+j2.p4.t4      .         .        1.000      EPS       
+j2.p4.t5      .         .        1.000      EPS       
+j2.p4.t6      .         .        1.000      EPS       
+j2.p4.t7      .         .        1.000      EPS       
+j2.p4.t8      .         .        1.000      EPS       
+j2.p4.t9      .         .        1.000      EPS       
+j3.p1.t1      .         .        1.000      EPS       
+j3.p1.t2      .         .        1.000      EPS       
+j3.p1.t3      .         .        1.000      EPS       
+j3.p1.t4      .         .        1.000      EPS       
+j3.p1.t5      .         .        1.000      EPS       
+j3.p1.t6      .         .        1.000      EPS       
+j3.p1.t7      .         .        1.000      EPS       
+j3.p1.t8      .         .        1.000      EPS       
+j3.p1.t9      .         .        1.000      EPS       
+j3.p2.t1      .         .        1.000      EPS       
+j3.p2.t2      .         .        1.000      EPS       
+j3.p2.t3      .         .        1.000      EPS       
+j3.p2.t4      .         .        1.000      EPS       
+j3.p2.t5      .         .        1.000      EPS       
+j3.p2.t6      .         .        1.000      EPS       
+j3.p2.t7      .         .        1.000      EPS       
+j3.p2.t8      .         .        1.000      EPS       
+j3.p2.t9      .         .        1.000      EPS       
+j3.p3.t1      .         .        1.000      EPS       
+j3.p3.t2      .         .        1.000      EPS       
+j3.p3.t3      .         .        1.000      EPS       
+j3.p3.t4      .         .        1.000      EPS       
+j3.p3.t5      .        1.000     1.000      EPS       
+j3.p3.t6      .        1.000     1.000      EPS       
+j3.p3.t7      .        1.000     1.000      EPS       
+j3.p3.t8      .        1.000     1.000      EPS       
+j3.p3.t9      .         .        1.000      EPS       
+j3.p4.t1      .        1.000     1.000      EPS       
+j3.p4.t2      .         .        1.000      EPS       
+j3.p4.t3      .         .        1.000      EPS       
+j3.p4.t4      .         .        1.000      EPS       
+j3.p4.t5      .         .        1.000      EPS       
+j3.p4.t6      .         .        1.000      EPS       
+j3.p4.t7      .         .        1.000      EPS       
+j3.p4.t8      .         .        1.000      EPS       
+j3.p4.t9      .         .        1.000      EPS       
+
+---- VAR X  activates W(jpt)
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+j1.p1.t1      .         .        1.000    -1.000      
+j1.p1.t2      .         .        1.000    -1.000      
+j1.p1.t3      .        1.000     1.000    -1.000      
+j1.p1.t4      .         .        1.000    -1.000      
+j1.p1.t5      .         .        1.000    -1.000      
+j1.p1.t6      .         .        1.000    -1.000      
+j1.p1.t7      .         .        1.000    -1.000      
+j1.p1.t8      .         .        1.000    -1.000      
+j1.p1.t9      .         .        1.000    -1.000      
+j1.p2.t1      .         .        1.000    -1.000      
+j1.p2.t2      .         .        1.000    -1.000      
+j1.p2.t3      .         .        1.000    -1.000      
+j1.p2.t4      .         .        1.000    -1.000      
+j1.p2.t5      .         .        1.000    -1.000      
+j1.p2.t6      .         .        1.000    -1.000      
+j1.p2.t7      .         .        1.000    -1.000      
+j1.p2.t8      .         .        1.000    -1.000      
+j1.p2.t9      .         .        1.000    -1.000      
+j1.p3.t1      .         .        1.000    -1.000      
+j1.p3.t2      .         .        1.000    -1.000      
+j1.p3.t3      .         .        1.000    -1.000      
+j1.p3.t4      .         .        1.000    -1.000      
+j1.p3.t5      .         .        1.000    -1.000      
+j1.p3.t6      .         .        1.000    -1.000      
+j1.p3.t7      .         .        1.000    -1.000      
+j1.p3.t8      .         .        1.000    -1.000      
+j1.p3.t9      .         .        1.000    -1.000      
+j1.p4.t1      .         .        1.000    -1.000      
+j1.p4.t2      .         .        1.000    -1.000      
+j1.p4.t3      .         .        1.000    -1.000      
+j1.p4.t4      .         .        1.000    -1.000      
+j1.p4.t5      .         .        1.000    -1.000      
+j1.p4.t6      .         .        1.000    -1.000      
+j1.p4.t7      .         .        1.000    -1.000      
+j1.p4.t8      .         .        1.000    -1.000      
+j1.p4.t9      .         .        1.000    -1.000      
+j2.p1.t1      .         .        1.000    -1.000      
+j2.p1.t2      .         .        1.000    -1.000      
+j2.p1.t3      .         .        1.000    -1.000      
+j2.p1.t4      .         .        1.000    -1.000      
+j2.p1.t5      .         .        1.000    -1.000      
+j2.p1.t6      .         .        1.000    -1.000      
+j2.p1.t7      .         .        1.000    -1.000      
+j2.p1.t8      .         .        1.000    -1.000      
+j2.p1.t9      .         .        1.000    -1.000      
+j2.p2.t1      .        1.000     1.000    -1.000      
+j2.p2.t2      .         .        1.000    -1.000      
+j2.p2.t3      .         .        1.000    -1.000      
+j2.p2.t4      .         .        1.000    -1.000      
+j2.p2.t5      .         .        1.000    -1.000      
+j2.p2.t6      .         .        1.000    -1.000      
+j2.p2.t7      .        1.000     1.000    -1.000      
+j2.p2.t8      .         .        1.000    -1.000      
+j2.p2.t9      .         .        1.000    -1.000      
+j2.p3.t1      .         .        1.000    -1.000      
+j2.p3.t2      .         .        1.000    -1.000      
+j2.p3.t3      .         .        1.000    -1.000      
+j2.p3.t4      .        1.000     1.000    -1.000      
+j2.p3.t5      .         .        1.000    -1.000      
+j2.p3.t6      .         .        1.000    -1.000      
+j2.p3.t7      .         .        1.000    -1.000      
+j2.p3.t8      .         .        1.000    -1.000      
+j2.p3.t9      .        1.000     1.000    -1.000      
+j2.p4.t1      .         .        1.000    -1.000      
+j2.p4.t2      .         .        1.000    -1.000      
+j2.p4.t3      .         .        1.000    -1.000      
+j2.p4.t4      .         .        1.000    -1.000      
+j2.p4.t5      .         .        1.000    -1.000      
+j2.p4.t6      .         .        1.000    -1.000      
+j2.p4.t7      .         .        1.000    -1.000      
+j2.p4.t8      .         .        1.000    -1.000      
+j2.p4.t9      .         .        1.000    -1.000      
+j3.p1.t1      .         .        1.000    -1.000      
+j3.p1.t2      .         .        1.000    -1.000      
+j3.p1.t3      .         .        1.000    -1.000      
+j3.p1.t4      .         .        1.000    -1.000      
+j3.p1.t5      .         .        1.000    -1.000      
+j3.p1.t6      .         .        1.000    -1.000      
+j3.p1.t7      .         .        1.000    -1.000      
+j3.p1.t8      .         .        1.000    -1.000      
+j3.p1.t9      .         .        1.000    -1.000      
+j3.p2.t1      .         .        1.000    -1.000      
+j3.p2.t2      .         .        1.000    -1.000      
+j3.p2.t3      .         .        1.000    -1.000      
+j3.p2.t4      .         .        1.000    -1.000      
+j3.p2.t5      .         .        1.000    -1.000      
+j3.p2.t6      .         .        1.000    -1.000      
+j3.p2.t7      .         .        1.000    -1.000      
+j3.p2.t8      .         .        1.000    -1.000      
+j3.p2.t9      .         .        1.000    -1.000      
+j3.p3.t1      .         .        1.000    -1.000      
+j3.p3.t2      .         .        1.000    -1.000      
+j3.p3.t3      .         .        1.000    -1.000      
+j3.p3.t4      .         .        1.000    -1.000      
+j3.p3.t5      .        1.000     1.000    -1.000      
+j3.p3.t6      .         .        1.000    -1.000      
+j3.p3.t7      .         .        1.000    -1.000      
+j3.p3.t8      .         .        1.000    -1.000      
+j3.p3.t9      .         .        1.000    -1.000      
+j3.p4.t1      .        1.000     1.000    -1.000      
+j3.p4.t2      .         .        1.000    -1.000      
+j3.p4.t3      .         .        1.000    -1.000      
+j3.p4.t4      .         .        1.000    -1.000      
+j3.p4.t5      .         .        1.000    -1.000      
+j3.p4.t6      .         .        1.000    -1.000      
+j3.p4.t7      .         .        1.000    -1.000      
+j3.p4.t8      .         .        1.000    -1.000      
+j3.p4.t9      .         .        1.000    -1.000      
+
+---- VAR Y  denotes whether p is manufactured in suite i at time t. Also activat
+            es Z(ipt)
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+i1.p1.t1      .         .        1.000      EPS       
+i1.p1.t2      .         .        1.000      EPS       
+i1.p1.t3      .        1.000     1.000      EPS       
+i1.p1.t4      .        1.000     1.000      EPS       
+i1.p1.t5      .         .        1.000      EPS       
+i1.p1.t6      .         .        1.000      EPS       
+i1.p1.t7      .         .        1.000      EPS       
+i1.p1.t8      .         .        1.000      EPS       
+i1.p1.t9      .         .        1.000      EPS       
+i1.p2.t1      .        1.000     1.000      EPS       
+i1.p2.t2      .        1.000     1.000      EPS       
+i1.p2.t3      .         .        1.000      EPS       
+i1.p2.t4      .         .        1.000      EPS       
+i1.p2.t5      .         .        1.000      EPS       
+i1.p2.t6      .         .        1.000      EPS       
+i1.p2.t7      .        1.000     1.000      EPS       
+i1.p2.t8      .        1.000     1.000      EPS       
+i1.p2.t9      .         .        1.000      EPS       
+i1.p3.t1      .         .        1.000      EPS       
+i1.p3.t2      .         .        1.000      EPS       
+i1.p3.t3      .         .        1.000      EPS       
+i1.p3.t4      .         .        1.000      EPS       
+i1.p3.t5      .        1.000     1.000      EPS       
+i1.p3.t6      .        1.000     1.000      EPS       
+i1.p3.t7      .         .        1.000      EPS       
+i1.p3.t8      .         .        1.000      EPS       
+i1.p3.t9      .        1.000     1.000      EPS       
+i1.p4.t1      .         .        1.000      EPS       
+i1.p4.t2      .         .        1.000      EPS       
+i1.p4.t3      .         .        1.000      EPS       
+i1.p4.t4      .         .        1.000      EPS       
+i1.p4.t5      .         .        1.000      EPS       
+i1.p4.t6      .         .        1.000      EPS       
+i1.p4.t7      .         .        1.000      EPS       
+i1.p4.t8      .         .        1.000      EPS       
+i1.p4.t9      .         .        1.000      EPS       
+i2.p1.t1      .         .        1.000      EPS       
+i2.p1.t2      .         .        1.000      EPS       
+i2.p1.t3      .         .        1.000      EPS       
+i2.p1.t4      .         .        1.000      EPS       
+i2.p1.t5      .         .        1.000      EPS       
+i2.p1.t6      .        1.000     1.000      EPS       
+i2.p1.t7      .        1.000     1.000      EPS       
+i2.p1.t8      .        1.000     1.000      EPS       
+i2.p1.t9      .         .        1.000      EPS       
+i2.p2.t1      .         .        1.000      EPS       
+i2.p2.t2      .         .        1.000      EPS       
+i2.p2.t3      .         .        1.000      EPS       
+i2.p2.t4      .         .        1.000      EPS       
+i2.p2.t5      .         .        1.000      EPS       
+i2.p2.t6      .         .        1.000      EPS       
+i2.p2.t7      .         .        1.000      EPS       
+i2.p2.t8      .         .        1.000      EPS       
+i2.p2.t9      .         .        1.000      EPS       
+i2.p3.t1      .         .        1.000      EPS       
+i2.p3.t2      .         .        1.000      EPS       
+i2.p3.t3      .         .        1.000      EPS       
+i2.p3.t4      .         .        1.000      EPS       
+i2.p3.t5      .        1.000     1.000      EPS       
+i2.p3.t6      .         .        1.000      EPS       
+i2.p3.t7      .         .        1.000      EPS       
+i2.p3.t8      .         .        1.000      EPS       
+i2.p3.t9      .        1.000     1.000      EPS       
+i2.p4.t1      .        1.000     1.000      EPS       
+i2.p4.t2      .        1.000     1.000      EPS       
+i2.p4.t3      .        1.000     1.000      EPS       
+i2.p4.t4      .        1.000     1.000      EPS       
+i2.p4.t5      .         .        1.000      EPS       
+i2.p4.t6      .         .        1.000      EPS       
+i2.p4.t7      .         .        1.000      EPS       
+i2.p4.t8      .         .        1.000      EPS       
+i2.p4.t9      .         .        1.000      EPS       
+
+---- VAR U  denotes whether p is manufactured in suite j at time t. Also activat
+            es X(jpt)
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+j1.p1.t1      .         .        1.000      EPS       
+j1.p1.t2      .         .        1.000      EPS       
+j1.p1.t3      .        1.000     1.000      EPS       
+j1.p1.t4      .        1.000     1.000      EPS       
+j1.p1.t5      .        1.000     1.000      EPS       
+j1.p1.t6      .        1.000     1.000      EPS       
+j1.p1.t7      .        1.000     1.000      EPS       
+j1.p1.t8      .        1.000     1.000      EPS       
+j1.p1.t9      .         .        1.000      EPS       
+j1.p2.t1      .         .        1.000      EPS       
+j1.p2.t2      .         .        1.000      EPS       
+j1.p2.t3      .         .        1.000      EPS       
+j1.p2.t4      .         .        1.000      EPS       
+j1.p2.t5      .         .        1.000      EPS       
+j1.p2.t6      .         .        1.000      EPS       
+j1.p2.t7      .         .        1.000      EPS       
+j1.p2.t8      .         .        1.000      EPS       
+j1.p2.t9      .         .        1.000      EPS       
+j1.p3.t1      .         .        1.000      EPS       
+j1.p3.t2      .         .        1.000      EPS       
+j1.p3.t3      .         .        1.000      EPS       
+j1.p3.t4      .         .        1.000      EPS       
+j1.p3.t5      .         .        1.000      EPS       
+j1.p3.t6      .         .        1.000      EPS       
+j1.p3.t7      .         .        1.000      EPS       
+j1.p3.t8      .         .        1.000      EPS       
+j1.p3.t9      .         .        1.000      EPS       
+j1.p4.t1      .         .        1.000      EPS       
+j1.p4.t2      .         .        1.000      EPS       
+j1.p4.t3      .         .        1.000      EPS       
+j1.p4.t4      .         .        1.000      EPS       
+j1.p4.t5      .         .        1.000      EPS       
+j1.p4.t6      .         .        1.000      EPS       
+j1.p4.t7      .         .        1.000      EPS       
+j1.p4.t8      .         .        1.000      EPS       
+j1.p4.t9      .         .        1.000      EPS       
+j2.p1.t1      .         .        1.000      EPS       
+j2.p1.t2      .         .        1.000      EPS       
+j2.p1.t3      .         .        1.000      EPS       
+j2.p1.t4      .         .        1.000      EPS       
+j2.p1.t5      .         .        1.000      EPS       
+j2.p1.t6      .         .        1.000      EPS       
+j2.p1.t7      .         .        1.000      EPS       
+j2.p1.t8      .         .        1.000      EPS       
+j2.p1.t9      .         .        1.000      EPS       
+j2.p2.t1      .        1.000     1.000      EPS       
+j2.p2.t2      .        1.000     1.000      EPS       
+j2.p2.t3      .         .        1.000      EPS       
+j2.p2.t4      .         .        1.000      EPS       
+j2.p2.t5      .         .        1.000      EPS       
+j2.p2.t6      .         .        1.000      EPS       
+j2.p2.t7      .        1.000     1.000      EPS       
+j2.p2.t8      .        1.000     1.000      EPS       
+j2.p2.t9      .         .        1.000      EPS       
+j2.p3.t1      .         .        1.000      EPS       
+j2.p3.t2      .         .        1.000      EPS       
+j2.p3.t3      .         .        1.000      EPS       
+j2.p3.t4      .        1.000     1.000      EPS       
+j2.p3.t5      .        1.000     1.000      EPS       
+j2.p3.t6      .        1.000     1.000      EPS       
+j2.p3.t7      .         .        1.000      EPS       
+j2.p3.t8      .         .        1.000      EPS       
+j2.p3.t9      .        1.000     1.000      EPS       
+j2.p4.t1      .         .        1.000      EPS       
+j2.p4.t2      .         .        1.000      EPS       
+j2.p4.t3      .         .        1.000      EPS       
+j2.p4.t4      .         .        1.000      EPS       
+j2.p4.t5      .         .        1.000      EPS       
+j2.p4.t6      .         .        1.000      EPS       
+j2.p4.t7      .         .        1.000      EPS       
+j2.p4.t8      .         .        1.000      EPS       
+j2.p4.t9      .         .        1.000      EPS       
+j3.p1.t1      .         .        1.000      EPS       
+j3.p1.t2      .         .        1.000      EPS       
+j3.p1.t3      .         .        1.000      EPS       
+j3.p1.t4      .         .        1.000      EPS       
+j3.p1.t5      .         .        1.000      EPS       
+j3.p1.t6      .         .        1.000      EPS       
+j3.p1.t7      .         .        1.000      EPS       
+j3.p1.t8      .         .        1.000      EPS       
+j3.p1.t9      .         .        1.000      EPS       
+j3.p2.t1      .         .        1.000      EPS       
+j3.p2.t2      .         .        1.000      EPS       
+j3.p2.t3      .         .        1.000      EPS       
+j3.p2.t4      .         .        1.000      EPS       
+j3.p2.t5      .         .        1.000      EPS       
+j3.p2.t6      .         .        1.000      EPS       
+j3.p2.t7      .         .        1.000      EPS       
+j3.p2.t8      .         .        1.000      EPS       
+j3.p2.t9      .         .        1.000      EPS       
+j3.p3.t1      .         .        1.000      EPS       
+j3.p3.t2      .         .        1.000      EPS       
+j3.p3.t3      .         .        1.000      EPS       
+j3.p3.t4      .         .        1.000      EPS       
+j3.p3.t5      .        1.000     1.000      EPS       
+j3.p3.t6      .        1.000     1.000      EPS       
+j3.p3.t7      .        1.000     1.000      EPS       
+j3.p3.t8      .        1.000     1.000      EPS       
+j3.p3.t9      .        1.000     1.000      EPS       
+j3.p4.t1      .        1.000     1.000      EPS       
+j3.p4.t2      .        1.000     1.000      EPS       
+j3.p4.t3      .        1.000     1.000      EPS       
+j3.p4.t4      .        1.000     1.000      EPS       
+j3.p4.t5      .         .        1.000      EPS       
+j3.p4.t6      .         .        1.000      EPS       
+j3.p4.t7      .         .        1.000      EPS       
+j3.p4.t8      .         .        1.000      EPS       
+j3.p4.t9      .         .        1.000      EPS       
+
+---- VAR CP  upstream production
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+i1.p1.t1      .         .        +INF     -5.000      
+i1.p1.t2      .         .        +INF     -5.000      
+i1.p1.t3      .        2.000     +INF     -5.000      
+i1.p1.t4      .        3.000     +INF     -5.000      
+i1.p1.t5      .         .        +INF     -5.000      
+i1.p1.t6      .         .        +INF     -5.000      
+i1.p1.t7      .         .        +INF     -5.000      
+i1.p1.t8      .         .        +INF     -5.000      
+i1.p1.t9      .         .        +INF     -5.000      
+i1.p2.t1      .        2.000     +INF     -2.000      
+i1.p2.t2      .        2.000     +INF     -2.000      
+i1.p2.t3      .         .        +INF     -2.000      
+i1.p2.t4      .         .        +INF     -2.000      
+i1.p2.t5      .         .        +INF     -2.000      
+i1.p2.t6      .         .        +INF     -2.000      
+i1.p2.t7      .        2.000     +INF     -2.000      
+i1.p2.t8      .        2.000     +INF     -2.000      
+i1.p2.t9      .         .        +INF     -2.000      
+i1.p3.t1      .         .        +INF     -1.000      
+i1.p3.t2      .         .        +INF     -1.000      
+i1.p3.t3      .         .        +INF     -1.000      
+i1.p3.t4      .         .        +INF     -1.000      
+i1.p3.t5      .        4.000     +INF     -1.000      
+i1.p3.t6      .        4.000     +INF     -1.000      
+i1.p3.t7      .         .        +INF     -1.000      
+i1.p3.t8      .         .        +INF     -1.000      
+i1.p3.t9      .        4.000     +INF     -1.000      
+i1.p4.t1      .         .        +INF     -1.000      
+i1.p4.t2      .         .        +INF     -1.000      
+i1.p4.t3      .         .        +INF     -1.000      
+i1.p4.t4      .         .        +INF     -1.000      
+i1.p4.t5      .         .        +INF     -1.000      
+i1.p4.t6      .         .        +INF     -1.000      
+i1.p4.t7      .         .        +INF     -1.000      
+i1.p4.t8      .         .        +INF     -1.000      
+i1.p4.t9      .         .        +INF     -1.000      
+i2.p1.t1      .         .        +INF     -5.000      
+i2.p1.t2      .         .        +INF     -5.000      
+i2.p1.t3      .         .        +INF     -5.000      
+i2.p1.t4      .         .        +INF     -5.000      
+i2.p1.t5      .         .        +INF     -5.000      
+i2.p1.t6      .        2.000     +INF     -5.000      
+i2.p1.t7      .        3.000     +INF     -5.000      
+i2.p1.t8      .        3.000     +INF     -5.000      
+i2.p1.t9      .         .        +INF     -5.000      
+i2.p2.t1      .         .        +INF     -2.000      
+i2.p2.t2      .         .        +INF     -2.000      
+i2.p2.t3      .         .        +INF     -2.000      
+i2.p2.t4      .         .        +INF     -2.000      
+i2.p2.t5      .         .        +INF     -2.000      
+i2.p2.t6      .         .        +INF     -2.000      
+i2.p2.t7      .         .        +INF     -2.000      
+i2.p2.t8      .         .        +INF     -2.000      
+i2.p2.t9      .         .        +INF     -2.000      
+i2.p3.t1      .         .        +INF     -1.000      
+i2.p3.t2      .         .        +INF     -1.000      
+i2.p3.t3      .         .        +INF     -1.000      
+i2.p3.t4      .         .        +INF     -1.000      
+i2.p3.t5      .        4.000     +INF     -1.000      
+i2.p3.t6      .         .        +INF     -1.000      
+i2.p3.t7      .         .        +INF     -1.000      
+i2.p3.t8      .         .        +INF     -1.000      
+i2.p3.t9      .        4.000     +INF     -1.000      
+i2.p4.t1      .        2.000     +INF     -1.000      
+i2.p4.t2      .        4.000     +INF     -1.000      
+i2.p4.t3      .        4.000     +INF     -1.000      
+i2.p4.t4      .        4.000     +INF     -1.000      
+i2.p4.t5      .         .        +INF     -1.000      
+i2.p4.t6      .         .        +INF     -1.000      
+i2.p4.t7      .         .        +INF     -1.000      
+i2.p4.t8      .         .        +INF     -1.000      
+i2.p4.t9      .         .        +INF     -1.000      
+
+---- VAR FP  downstream production
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+j1.p1.t1      .         .        +INF     95.000      
+j1.p1.t2      .         .        +INF     96.000      
+j1.p1.t3      .        2.000     +INF     97.000      
+j1.p1.t4      .        3.000     +INF     98.000      
+j1.p1.t5      .         .        +INF     99.000      
+j1.p1.t6      .        2.000     +INF     58.000      
+j1.p1.t7      .        3.000     +INF     38.000      
+j1.p1.t8      .        3.000     +INF     39.000      
+j1.p1.t9      .         .        +INF     40.000      
+j1.p2.t1      .         .        +INF     -4.000      
+j1.p2.t2      .         .        +INF     -3.000      
+j1.p2.t3      .         .        +INF     -2.000      
+j1.p2.t4      .         .        +INF     78.000      
+j1.p2.t5      .         .        +INF     16.000      
+j1.p2.t6      .         .        +INF     17.000      
+j1.p2.t7      .         .        +INF     18.000      
+j1.p2.t8      .         .        +INF     -2.000      
+j1.p2.t9      .         .        +INF     -2.000      
+j1.p3.t1      .         .        +INF     32.000      
+j1.p3.t2      .         .        +INF     33.000      
+j1.p3.t3      .         .        +INF     34.000      
+j1.p3.t4      .         .        +INF     35.000      
+j1.p3.t5      .         .        +INF     36.000      
+j1.p3.t6      .         .        +INF     16.000      
+j1.p3.t7      .         .        +INF     17.000      
+j1.p3.t8      .         .        +INF     18.000      
+j1.p3.t9      .         .        +INF     19.000      
+j1.p4.t1      .         .        +INF     -2.000      
+j1.p4.t2      .         .        +INF     -1.000      
+j1.p4.t3      .         .        +INF       EPS       
+j1.p4.t4      .         .        +INF      1.000      
+j1.p4.t5      .         .        +INF     -2.000      
+j1.p4.t6      .         .        +INF     -1.000      
+j1.p4.t7      .         .        +INF       EPS       
+j1.p4.t8      .         .        +INF     -1.000      
+j1.p4.t9      .         .        +INF       EPS       
+j2.p1.t1      .         .        +INF     95.000      
+j2.p1.t2      .         .        +INF     96.000      
+j2.p1.t3      .         .        +INF     97.000      
+j2.p1.t4      .         .        +INF     98.000      
+j2.p1.t5      .         .        +INF     99.000      
+j2.p1.t6      .         .        +INF     58.000      
+j2.p1.t7      .         .        +INF     38.000      
+j2.p1.t8      .         .        +INF     39.000      
+j2.p1.t9      .         .        +INF     40.000      
+j2.p2.t1      .        2.000     +INF     -4.000      
+j2.p2.t2      .        2.000     +INF     -3.000      
+j2.p2.t3      .         .        +INF     -2.000      
+j2.p2.t4      .         .        +INF     78.000      
+j2.p2.t5      .         .        +INF     16.000      
+j2.p2.t6      .         .        +INF     17.000      
+j2.p2.t7      .        2.000     +INF     18.000      
+j2.p2.t8      .        2.000     +INF     -2.000      
+j2.p2.t9      .         .        +INF     -2.000      
+j2.p3.t1      .         .        +INF     32.000      
+j2.p3.t2      .         .        +INF     33.000      
+j2.p3.t3      .         .        +INF     34.000      
+j2.p3.t4      .         .        +INF     35.000      
+j2.p3.t5      .        6.000     +INF     36.000      
+j2.p3.t6      .        4.000     +INF     16.000      
+j2.p3.t7      .         .        +INF     17.000      
+j2.p3.t8      .         .        +INF     18.000      
+j2.p3.t9      .        2.000     +INF     19.000      
+j2.p4.t1      .         .        +INF     -2.000      
+j2.p4.t2      .         .        +INF     -1.000      
+j2.p4.t3      .         .        +INF       EPS       
+j2.p4.t4      .         .        +INF      1.000      
+j2.p4.t5      .         .        +INF     -2.000      
+j2.p4.t6      .         .        +INF     -1.000      
+j2.p4.t7      .         .        +INF       EPS       
+j2.p4.t8      .         .        +INF     -1.000      
+j2.p4.t9      .         .        +INF       EPS       
+j3.p1.t1      .         .        +INF     95.000      
+j3.p1.t2      .         .        +INF     96.000      
+j3.p1.t3      .         .        +INF     97.000      
+j3.p1.t4      .         .        +INF     98.000      
+j3.p1.t5      .         .        +INF     99.000      
+j3.p1.t6      .         .        +INF     58.000      
+j3.p1.t7      .         .        +INF     38.000      
+j3.p1.t8      .         .        +INF     39.000      
+j3.p1.t9      .         .        +INF     40.000      
+j3.p2.t1      .         .        +INF     -4.000      
+j3.p2.t2      .         .        +INF     -3.000      
+j3.p2.t3      .         .        +INF     -2.000      
+j3.p2.t4      .         .        +INF     78.000      
+j3.p2.t5      .         .        +INF     16.000      
+j3.p2.t6      .         .        +INF     17.000      
+j3.p2.t7      .         .        +INF     18.000      
+j3.p2.t8      .         .        +INF     -2.000      
+j3.p2.t9      .         .        +INF     -2.000      
+j3.p3.t1      .         .        +INF     32.000      
+j3.p3.t2      .         .        +INF     33.000      
+j3.p3.t3      .         .        +INF     34.000      
+j3.p3.t4      .         .        +INF     35.000      
+j3.p3.t5      .        2.000     +INF     36.000      
+j3.p3.t6      .         .        +INF     16.000      
+j3.p3.t7      .         .        +INF     17.000      
+j3.p3.t8      .         .        +INF     18.000      
+j3.p3.t9      .        6.000     +INF     19.000      
+j3.p4.t1      .        2.000     +INF     -2.000      
+j3.p4.t2      .        4.000     +INF     -1.000      
+j3.p4.t3      .        4.000     +INF       EPS       
+j3.p4.t4      .        4.000     +INF      1.000      
+j3.p4.t5      .         .        +INF     -2.000      
+j3.p4.t6      .         .        +INF     -1.000      
+j3.p4.t7      .         .        +INF       EPS       
+j3.p4.t8      .         .        +INF     -1.000      
+j3.p4.t9      .         .        +INF       EPS       
+
+---- VAR CT  upstream production time
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+i1.p1.t1      .         .        +INF       EPS       
+i1.p1.t2      .         .        +INF       EPS       
+i1.p1.t3      .       50.000     +INF       .         
+i1.p1.t4      .       60.000     +INF       .         
+i1.p1.t5      .         .        +INF       EPS       
+i1.p1.t6      .         .        +INF       EPS       
+i1.p1.t7      .         .        +INF       EPS       
+i1.p1.t8      .         .        +INF       EPS       
+i1.p1.t9      .         .        +INF       EPS       
+i1.p2.t1      .       54.222     +INF       .         
+i1.p2.t2      .       44.444     +INF       .         
+i1.p2.t3      .         .        +INF       EPS       
+i1.p2.t4      .         .        +INF       EPS       
+i1.p2.t5      .         .        +INF       EPS       
+i1.p2.t6      .         .        +INF       EPS       
+i1.p2.t7      .       54.222     +INF       .         
+i1.p2.t8      .       44.444     +INF       .         
+i1.p2.t9      .         .        +INF       EPS       
+i1.p3.t1      .         .        +INF       EPS       
+i1.p3.t2      .         .        +INF       EPS       
+i1.p3.t3      .         .        +INF       EPS       
+i1.p3.t4      .         .        +INF       EPS       
+i1.p3.t5      .       60.000     +INF       .         
+i1.p3.t6      .       50.000     +INF       .         
+i1.p3.t7      .         .        +INF       EPS       
+i1.p3.t8      .         .        +INF       EPS       
+i1.p3.t9      .       60.000     +INF       .         
+i1.p4.t1      .         .        +INF       EPS       
+i1.p4.t2      .         .        +INF       EPS       
+i1.p4.t3      .         .        +INF       EPS       
+i1.p4.t4      .         .        +INF       EPS       
+i1.p4.t5      .         .        +INF       EPS       
+i1.p4.t6      .         .        +INF       EPS       
+i1.p4.t7      .         .        +INF       EPS       
+i1.p4.t8      .         .        +INF       EPS       
+i1.p4.t9      .         .        +INF       EPS       
+i2.p1.t1      .         .        +INF       EPS       
+i2.p1.t2      .         .        +INF       EPS       
+i2.p1.t3      .         .        +INF       EPS       
+i2.p1.t4      .         .        +INF       EPS       
+i2.p1.t5      .         .        +INF       EPS       
+i2.p1.t6      .       50.000     +INF       .         
+i2.p1.t7      .       60.000     +INF       .         
+i2.p1.t8      .       60.000     +INF       .         
+i2.p1.t9      .         .        +INF       EPS       
+i2.p2.t1      .         .        +INF       EPS       
+i2.p2.t2      .         .        +INF       EPS       
+i2.p2.t3      .         .        +INF       EPS       
+i2.p2.t4      .         .        +INF       EPS       
+i2.p2.t5      .         .        +INF       EPS       
+i2.p2.t6      .         .        +INF       EPS       
+i2.p2.t7      .         .        +INF       EPS       
+i2.p2.t8      .         .        +INF       EPS       
+i2.p2.t9      .         .        +INF       EPS       
+i2.p3.t1      .         .        +INF       EPS       
+i2.p3.t2      .         .        +INF       EPS       
+i2.p3.t3      .         .        +INF       EPS       
+i2.p3.t4      .         .        +INF       EPS       
+i2.p3.t5      .       60.000     +INF       .         
+i2.p3.t6      .         .        +INF       EPS       
+i2.p3.t7      .         .        +INF       EPS       
+i2.p3.t8      .         .        +INF       EPS       
+i2.p3.t9      .       60.000     +INF       .         
+i2.p4.t1      .       35.000     +INF       .         
+i2.p4.t2      .       50.000     +INF       .         
+i2.p4.t3      .       50.000     +INF       .         
+i2.p4.t4      .       50.000     +INF       .         
+i2.p4.t5      .         .        +INF       EPS       
+i2.p4.t6      .         .        +INF       EPS       
+i2.p4.t7      .         .        +INF       EPS       
+i2.p4.t8      .         .        +INF       EPS       
+i2.p4.t9      .         .        +INF       EPS       
+
+---- VAR FT  downstream production time
+
+            LOWER     LEVEL     UPPER    MARGINAL
+
+j1.p1.t1      .         .        +INF       EPS       
+j1.p1.t2      .         .        +INF       EPS       
+j1.p1.t3      .       50.000     +INF       .         
+j1.p1.t4      .       30.000     +INF       .         
+j1.p1.t5      .       30.000     +INF       .         
+j1.p1.t6      .       20.000     +INF       .         
+j1.p1.t7      .       30.000     +INF       .         
+j1.p1.t8      .       30.000     +INF       .         
+j1.p1.t9      .         .        +INF       EPS       
+j1.p2.t1      .         .        +INF       EPS       
+j1.p2.t2      .         .        +INF       EPS       
+j1.p2.t3      .         .        +INF       EPS       
+j1.p2.t4      .         .        +INF       EPS       
+j1.p2.t5      .         .        +INF       EPS       
+j1.p2.t6      .         .        +INF       EPS       
+j1.p2.t7      .         .        +INF       EPS       
+j1.p2.t8      .         .        +INF       EPS       
+j1.p2.t9      .         .        +INF       EPS       
+j1.p3.t1      .         .        +INF       EPS       
+j1.p3.t2      .         .        +INF       EPS       
+j1.p3.t3      .         .        +INF       EPS       
+j1.p3.t4      .         .        +INF       EPS       
+j1.p3.t5      .         .        +INF       EPS       
+j1.p3.t6      .         .        +INF       EPS       
+j1.p3.t7      .         .        +INF       EPS       
+j1.p3.t8      .         .        +INF       EPS       
+j1.p3.t9      .         .        +INF       EPS       
+j1.p4.t1      .         .        +INF       EPS       
+j1.p4.t2      .         .        +INF       EPS       
+j1.p4.t3      .         .        +INF       EPS       
+j1.p4.t4      .         .        +INF       EPS       
+j1.p4.t5      .         .        +INF       EPS       
+j1.p4.t6      .         .        +INF       EPS       
+j1.p4.t7      .         .        +INF       EPS       
+j1.p4.t8      .         .        +INF       EPS       
+j1.p4.t9      .         .        +INF       EPS       
+j2.p1.t1      .         .        +INF       EPS       
+j2.p1.t2      .         .        +INF       EPS       
+j2.p1.t3      .         .        +INF       EPS       
+j2.p1.t4      .         .        +INF       EPS       
+j2.p1.t5      .         .        +INF       EPS       
+j2.p1.t6      .         .        +INF       EPS       
+j2.p1.t7      .         .        +INF       EPS       
+j2.p1.t8      .         .        +INF       EPS       
+j2.p1.t9      .         .        +INF       EPS       
+j2.p2.t1      .       52.000     +INF       .         
+j2.p2.t2      .       20.000     +INF       .         
+j2.p2.t3      .         .        +INF       EPS       
+j2.p2.t4      .         .        +INF       EPS       
+j2.p2.t5      .         .        +INF       EPS       
+j2.p2.t6      .         .        +INF       EPS       
+j2.p2.t7      .       52.000     +INF       .         
+j2.p2.t8      .       20.000     +INF       .         
+j2.p2.t9      .         .        +INF       EPS       
+j2.p3.t1      .         .        +INF       EPS       
+j2.p3.t2      .         .        +INF       EPS       
+j2.p3.t3      .         .        +INF       EPS       
+j2.p3.t4      .       34.500     +INF       .         
+j2.p3.t5      .       60.000     +INF       .         
+j2.p3.t6      .       40.000     +INF       .         
+j2.p3.t7      .         .        +INF       EPS       
+j2.p3.t8      .         .        +INF       EPS       
+j2.p3.t9      .       54.500     +INF       .         
+j2.p4.t1      .         .        +INF       EPS       
+j2.p4.t2      .         .        +INF       EPS       
+j2.p4.t3      .         .        +INF       EPS       
+j2.p4.t4      .         .        +INF       EPS       
+j2.p4.t5      .         .        +INF       EPS       
+j2.p4.t6      .         .        +INF       EPS       
+j2.p4.t7      .         .        +INF       EPS       
+j2.p4.t8      .         .        +INF       EPS       
+j2.p4.t9      .         .        +INF       EPS       
+j3.p1.t1      .         .        +INF       EPS       
+j3.p1.t2      .         .        +INF       EPS       
+j3.p1.t3      .         .        +INF       EPS       
+j3.p1.t4      .         .        +INF       EPS       
+j3.p1.t5      .         .        +INF       EPS       
+j3.p1.t6      .         .        +INF       EPS       
+j3.p1.t7      .         .        +INF       EPS       
+j3.p1.t8      .         .        +INF       EPS       
+j3.p1.t9      .         .        +INF       EPS       
+j3.p2.t1      .         .        +INF       EPS       
+j3.p2.t2      .         .        +INF       EPS       
+j3.p2.t3      .         .        +INF       EPS       
+j3.p2.t4      .         .        +INF       EPS       
+j3.p2.t5      .         .        +INF       EPS       
+j3.p2.t6      .         .        +INF       EPS       
+j3.p2.t7      .         .        +INF       EPS       
+j3.p2.t8      .         .        +INF       EPS       
+j3.p2.t9      .         .        +INF       EPS       
+j3.p3.t1      .         .        +INF       EPS       
+j3.p3.t2      .         .        +INF       EPS       
+j3.p3.t3      .         .        +INF       EPS       
+j3.p3.t4      .         .        +INF       EPS       
+j3.p3.t5      .       54.500     +INF       .         
+j3.p3.t6      .       34.500     +INF       .         
+j3.p3.t7      .       34.500     +INF       .         
+j3.p3.t8      .       34.500     +INF       .         
+j3.p3.t9      .       60.000     +INF       .         
+j3.p4.t1      .       54.500     +INF       .         
+j3.p4.t2      .       40.000     +INF       .         
+j3.p4.t3      .       40.000     +INF       .         
+j3.p4.t4      .       40.000     +INF       .         
+j3.p4.t5      .         .        +INF       EPS       
+j3.p4.t6      .         .        +INF       EPS       
+j3.p4.t7      .         .        +INF       EPS       
+j3.p4.t8      .         .        +INF       EPS       
+j3.p4.t9      .         .        +INF       EPS       
+
+---- VAR CTtot  total upstream time
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+i1.t1      .       54.222     +INF       .         
+i1.t2      .       44.444     +INF       .         
+i1.t3      .       50.000     +INF       .         
+i1.t4      .       60.000     +INF       .         
+i1.t5      .       60.000     +INF       .         
+i1.t6      .       50.000     +INF       .         
+i1.t7      .       54.222     +INF       .         
+i1.t8      .       44.444     +INF       .         
+i1.t9      .       60.000     +INF       .         
+i2.t1      .       35.000     +INF       .         
+i2.t2      .       50.000     +INF       .         
+i2.t3      .       50.000     +INF       .         
+i2.t4      .       50.000     +INF       .         
+i2.t5      .       60.000     +INF       .         
+i2.t6      .       50.000     +INF       .         
+i2.t7      .       60.000     +INF       .         
+i2.t8      .       60.000     +INF       .         
+i2.t9      .       60.000     +INF       .         
+
+---- VAR FTtot  total downstream time
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+j1.t1      .         .        +INF       EPS       
+j1.t2      .         .        +INF       EPS       
+j1.t3      .       50.000     +INF       .         
+j1.t4      .       30.000     +INF       .         
+j1.t5      .       30.000     +INF       .         
+j1.t6      .       20.000     +INF       .         
+j1.t7      .       30.000     +INF       .         
+j1.t8      .       30.000     +INF       .         
+j1.t9      .         .        +INF       EPS       
+j2.t1      .       52.000     +INF       .         
+j2.t2      .       20.000     +INF       .         
+j2.t3      .         .        +INF       EPS       
+j2.t4      .       34.500     +INF       .         
+j2.t5      .       60.000     +INF       .         
+j2.t6      .       40.000     +INF       .         
+j2.t7      .       52.000     +INF       .         
+j2.t8      .       20.000     +INF       .         
+j2.t9      .       54.500     +INF       .         
+j3.t1      .       54.500     +INF       .         
+j3.t2      .       40.000     +INF       .         
+j3.t3      .       40.000     +INF       .         
+j3.t4      .       40.000     +INF       .         
+j3.t5      .       54.500     +INF       .         
+j3.t6      .       34.500     +INF       .         
+j3.t7      .       34.500     +INF       .         
+j3.t8      .       34.500     +INF       .         
+j3.t9      .       60.000     +INF       .         
+
+---- VAR CI  amount of crude p stored at time t
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+p1.t1      .         .        +INF     -5.000      
+p1.t2      .         .        +INF     -5.000      
+p1.t3      .         .        +INF     -5.000      
+p1.t4      .         .        +INF     -5.000      
+p1.t5      .         .        +INF     -5.000      
+p1.t6      .         .        +INF     -5.000      
+p1.t7      .         .        +INF     -5.000      
+p1.t8      .         .        +INF     -5.000      
+p1.t9      .         .        +INF     -5.000      
+p2.t1      .         .        +INF     -5.000      
+p2.t2      .         .        +INF     -5.000      
+p2.t3      .         .        +INF     -5.000      
+p2.t4      .         .        +INF     -5.000      
+p2.t5      .         .        +INF     -5.000      
+p2.t6      .         .        +INF     -5.000      
+p2.t7      .         .        +INF     -5.000      
+p2.t8      .         .        +INF     -5.000      
+p2.t9      .         .        +INF     -5.000      
+p3.t1      .         .        +INF     -5.000      
+p3.t2      .         .        +INF     -5.000      
+p3.t3      .         .        +INF     -5.000      
+p3.t4      .         .        +INF     -5.000      
+p3.t5      .         .        +INF     -5.000      
+p3.t6      .         .        +INF     -5.000      
+p3.t7      .         .        +INF     -5.000      
+p3.t8      .         .        +INF     -5.000      
+p3.t9      .         .        +INF     -5.000      
+p4.t1      .         .        +INF     -5.000      
+p4.t2      .         .        +INF     -5.000      
+p4.t3      .         .        +INF     -5.000      
+p4.t4      .         .        +INF     -5.000      
+p4.t5      .         .        +INF     -5.000      
+p4.t6      .         .        +INF     -5.000      
+p4.t7      .         .        +INF     -5.000      
+p4.t8      .         .        +INF     -5.000      
+p4.t9      .         .        +INF     -5.000      
+
+---- VAR CW  amount of crude p wasted
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+p1.t1      .         .        +INF     -5.000      
+p1.t2      .         .        +INF     -5.000      
+p1.t3      .         .        +INF     -5.000      
+p1.t4      .         .        +INF     -5.000      
+p1.t5      .         .        +INF     -5.000      
+p1.t6      .         .        +INF     -5.000      
+p1.t7      .         .        +INF     -5.000      
+p1.t8      .         .        +INF     -5.000      
+p1.t9      .         .        +INF     -5.000      
+p2.t1      .         .        +INF     -5.000      
+p2.t2      .         .        +INF     -5.000      
+p2.t3      .         .        +INF     -5.000      
+p2.t4      .         .        +INF     -5.000      
+p2.t5      .         .        +INF     -5.000      
+p2.t6      .         .        +INF     -5.000      
+p2.t7      .         .        +INF     -5.000      
+p2.t8      .         .        +INF     -5.000      
+p2.t9      .         .        +INF     -5.000      
+p3.t1      .         .        +INF     -5.000      
+p3.t2      .         .        +INF     -5.000      
+p3.t3      .         .        +INF     -5.000      
+p3.t4      .         .        +INF     -5.000      
+p3.t5      .         .        +INF     -5.000      
+p3.t6      .         .        +INF     -5.000      
+p3.t7      .         .        +INF     -5.000      
+p3.t8      .         .        +INF     -5.000      
+p3.t9      .         .        +INF     -5.000      
+p4.t1      .         .        +INF     -5.000      
+p4.t2      .         .        +INF     -5.000      
+p4.t3      .         .        +INF     -5.000      
+p4.t4      .         .        +INF     -5.000      
+p4.t5      .         .        +INF     -5.000      
+p4.t6      .         .        +INF     -5.000      
+p4.t7      .         .        +INF     -5.000      
+p4.t8      .         .        +INF     -5.000      
+p4.t9      .         .        +INF     -5.000      
+
+---- VAR FI  amount of final p stored at time t
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+p1.t1      .         .        +INF       .         
+p1.t2      .         .        +INF       .         
+p1.t3      .        2.000     +INF       .         
+p1.t4      .         .        +INF       .         
+p1.t5      .         .        +INF    -42.000      
+p1.t6      .         .        +INF    -21.000      
+p1.t7      .         .        +INF       .         
+p1.t8      .        3.000     +INF       .         
+p1.t9      .         .        +INF    -46.000      
+p2.t1      .        2.000     +INF       .         
+p2.t2      .         .        +INF       .         
+p2.t3      .         .        +INF       .         
+p2.t4      .         .        +INF    -63.000      
+p2.t5      .         .        +INF       .         
+p2.t6      .         .        +INF       .         
+p2.t7      .         .        +INF    -21.000      
+p2.t8      .         .        +INF     -1.000      
+p2.t9      .         .        +INF     -1.000      
+p3.t1      .         .        +INF       .         
+p3.t2      .         .        +INF       .         
+p3.t3      .         .        +INF       .         
+p3.t4      .         .        +INF       .         
+p3.t5      .         .        +INF    -21.000      
+p3.t6      .        2.000     +INF       .         
+p3.t7      .        2.000     +INF       .         
+p3.t8      .        2.000     +INF       .         
+p3.t9      .         .        +INF    -21.000      
+p4.t1      .        2.000     +INF       .         
+p4.t2      .         .        +INF       .         
+p4.t3      .        4.000     +INF       .         
+p4.t4      .         .        +INF     -4.000      
+p4.t5      .         .        +INF       .         
+p4.t6      .         .        +INF       .         
+p4.t7      .         .        +INF     -2.000      
+p4.t8      .         .        +INF       .         
+p4.t9      .         .        +INF     -2.000      
+
+---- VAR S  sales
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+p1.t1      .         .        +INF    -75.000      
+p1.t2      .         .        +INF    -76.000      
+p1.t3      .         .        +INF    -77.000      
+p1.t4      .        5.000     +INF       .         
+p1.t5      .         .        +INF    -21.000      
+p1.t6      .        2.000     +INF       .         
+p1.t7      .        3.000     +INF       .         
+p1.t8      .         .        +INF    -21.000      
+p1.t9      .        3.000     +INF       .         
+p2.t1      .         .        +INF       .         
+p2.t2      .        4.000     +INF       .         
+p2.t3      .         .        +INF    -21.000      
+p2.t4      .         .        +INF    -42.000      
+p2.t5      .         .        +INF       .         
+p2.t6      .         .        +INF    -21.000      
+p2.t7      .        2.000     +INF       .         
+p2.t8      .        2.000     +INF       .         
+p2.t9      .         .        +INF    -20.000      
+p3.t1      .         .        +INF    -16.000      
+p3.t2      .         .        +INF    -17.000      
+p3.t3      .         .        +INF    -18.000      
+p3.t4      .         .        +INF    -19.000      
+p3.t5      .        8.000     +INF       .         
+p3.t6      .        2.000     +INF       .         
+p3.t7      .         .        +INF    -21.000      
+p3.t8      .         .        +INF    -42.000      
+p3.t9      .       10.000     +INF       .         
+p4.t1      .         .        +INF       .         
+p4.t2      .        6.000     +INF       .         
+p4.t3      .         .        +INF    -21.000      
+p4.t4      .        8.000     +INF       .         
+p4.t5      .         .        +INF    -17.000      
+p4.t6      .         .        +INF    -38.000      
+p4.t7      .         .        +INF    -59.000      
+p4.t8      .         .        +INF    -78.000      
+p4.t9      .         .        +INF    -99.000      
+
+---- VAR FW  amount of final p wasted
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+p1.t1      .         .        +INF   -105.000      
+p1.t2      .         .        +INF   -106.000      
+p1.t3      .         .        +INF   -107.000      
+p1.t4      .         .        +INF   -108.000      
+p1.t5      .         .        +INF   -109.000      
+p1.t6      .         .        +INF    -68.000      
+p1.t7      .         .        +INF    -48.000      
+p1.t8      .         .        +INF    -49.000      
+p1.t9      .         .        +INF    -50.000      
+p2.t1      .         .        +INF     -3.000      
+p2.t2      .         .        +INF     -4.000      
+p2.t3      .         .        +INF     -5.000      
+p2.t4      .         .        +INF    -85.000      
+p2.t5      .         .        +INF    -23.000      
+p2.t6      .         .        +INF    -24.000      
+p2.t7      .         .        +INF    -25.000      
+p2.t8      .         .        +INF     -5.000      
+p2.t9      .         .        +INF     -5.000      
+p3.t1      .         .        +INF    -38.000      
+p3.t2      .         .        +INF    -39.000      
+p3.t3      .         .        +INF    -40.000      
+p3.t4      .         .        +INF    -41.000      
+p3.t5      .         .        +INF    -42.000      
+p3.t6      .         .        +INF    -22.000      
+p3.t7      .         .        +INF    -23.000      
+p3.t8      .         .        +INF    -24.000      
+p3.t9      .         .        +INF    -25.000      
+p4.t1      .         .        +INF     -4.000      
+p4.t2      .         .        +INF     -5.000      
+p4.t3      .         .        +INF     -6.000      
+p4.t4      .         .        +INF     -7.000      
+p4.t5      .         .        +INF     -4.000      
+p4.t6      .         .        +INF     -5.000      
+p4.t7      .         .        +INF     -6.000      
+p4.t8      .         .        +INF     -5.000      
+p4.t9      .         .        +INF     -6.000      
+
+---- VAR delta  penalty for the late delivery of p at time t
+
+         LOWER     LEVEL     UPPER    MARGINAL
+
+p1.t1      .         .        +INF    -20.000      
+p1.t2      .         .        +INF    -20.000      
+p1.t3      .         .        +INF    -98.000      
+p1.t4      .        1.000     +INF       .         
+p1.t5      .        1.000     +INF       .         
+p1.t6      .        3.000     +INF       .         
+p1.t7      .         .        +INF       .         
+p1.t8      .         .        +INF    -42.000      
+p1.t9      .        1.000     +INF       .         
+p2.t1      .         .        +INF    -21.000      
+p2.t2      .         .        +INF       .         
+p2.t3      .         .        +INF       .         
+p2.t4      .         .        +INF       .         
+p2.t5      .         .        +INF       .         
+p2.t6      .         .        +INF   -121.000      
+p2.t7      .        2.000     +INF       .         
+p2.t8      .         .        +INF       .         
+p2.t9      .         .        +INF    -60.000      
+p3.t1      .         .        +INF    -20.000      
+p3.t2      .         .        +INF    -20.000      
+p3.t3      .         .        +INF    -20.000      
+p3.t4      .         .        +INF    -40.000      
+p3.t5      .        2.000     +INF       .         
+p3.t6      .         .        +INF       .         
+p3.t7      .         .        +INF       .         
+p3.t8      .         .        +INF    -63.000      
+p3.t9      .         .        +INF    -17.000      
+p4.t1      .         .        +INF    -21.000      
+p4.t2      .         .        +INF       .         
+p4.t3      .         .        +INF    -42.000      
+p4.t4      .         .        +INF       .         
+p4.t5      .         .        +INF       .         
+p4.t6      .         .        +INF       .         
+p4.t7      .         .        +INF       .         
+p4.t8      .         .        +INF       .         
+p4.t9      .         .        +INF   -135.000      
+
+                       LOWER     LEVEL     UPPER    MARGINAL
+
+---- VAR profit         -INF    598.000     +INF       .         
+---- VAR Sold           -INF   1063.000     +INF       .         
+---- VAR TC             -INF    465.000     +INF       .         
+---- VAR PC             -INF    230.000     +INF       .         
+---- VAR CC             -INF     16.000     +INF       .         
+---- VAR SC             -INF     19.000     +INF       .         
+---- VAR BC             -INF    200.000     +INF       .         
+---- VAR WC             -INF       .        +INF       .         
+
+
+**** REPORT SUMMARY :        0     NONOPT
+                             0 INFEASIBLE
+                             0  UNBOUNDED
+GAMS Rev 239  WEX-WEI 23.9.5 x86_64/MS Windows          08/05/18 20:56:27 Page 6
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+E x e c u t i o n
+
+
+----    210 VARIABLE profit.L              =      598.000  
+            VARIABLE Sold.L                =     1063.000  
+            VARIABLE TC.L                  =      465.000  
+            VARIABLE PC.L                  =      230.000  
+            VARIABLE BC.L                  =      200.000  
+            VARIABLE SC.L                  =       19.000  
+            VARIABLE CC.L                  =       16.000  
+            VARIABLE WC.L                  =        0.000  
+
+----    210 VARIABLE FI.L  amount of final p stored at time t
+
+            t1          t3          t6          t7          t8
+
+p1                   2.000                               3.000
+p2       2.000
+p3                               2.000       2.000       2.000
+p4       2.000       4.000
+
+
+----    210 VARIABLE S.L  sales
+
+            t2          t4          t5          t6          t7          t8
+
+p1                   5.000                   2.000       3.000
+p2       4.000                                           2.000       2.000
+p3                               8.000       2.000
+p4       6.000       8.000
+
+ +          t9
+
+p1       3.000
+p3      10.000
+
+
+----    210 VARIABLE delta.L  penalty for the late delivery of p at time t
+
+            t4          t5          t6          t7          t9
+
+p1       1.000       1.000       3.000                   1.000
+p2                                           2.000
+p3                   2.000
+
+
+----    210 VARIABLE CP.L  upstream production
+
+               t1          t2          t3          t4          t5          t6
+
+i1.p1                               2.000       3.000
+i1.p2       2.000       2.000
+i1.p3                                                       4.000       4.000
+i2.p1                                                                   2.000
+i2.p3                                                       4.000
+i2.p4       2.000       4.000       4.000       4.000
+
+    +          t7          t8          t9
+
+i1.p2       2.000       2.000
+i1.p3                               4.000
+i2.p1       3.000       3.000
+i2.p3                               4.000
+
+
+----    210 VARIABLE CT.L  upstream production time
+
+               t1          t2          t3          t4          t5          t6
+
+i1.p1                              50.000      60.000
+i1.p2      54.222      44.444
+i1.p3                                                      60.000      50.000
+i2.p1                                                                  50.000
+i2.p3                                                      60.000
+i2.p4      35.000      50.000      50.000      50.000
+
+    +          t7          t8          t9
+
+i1.p2      54.222      44.444
+i1.p3                              60.000
+i2.p1      60.000      60.000
+i2.p3                              60.000
+
+
+----    210 VARIABLE FP.L  downstream production
+
+               t1          t2          t3          t4          t5          t6
+
+j1.p1                               2.000       3.000                   2.000
+j2.p2       2.000       2.000
+j2.p3                                                       6.000       4.000
+j3.p3                                                       2.000
+j3.p4       2.000       4.000       4.000       4.000
+
+    +          t7          t8          t9
+
+j1.p1       3.000       3.000
+j2.p2       2.000       2.000
+j2.p3                               2.000
+j3.p3                               6.000
+
+
+----    210 VARIABLE FT.L  downstream production time
+
+               t1          t2          t3          t4          t5          t6
+
+j1.p1                              50.000      30.000      30.000      20.000
+j2.p2      52.000      20.000
+j2.p3                                          34.500      60.000      40.000
+j3.p3                                                      54.500      34.500
+j3.p4      54.500      40.000      40.000      40.000
+
+    +          t7          t8          t9
+
+j1.p1      30.000      30.000
+j2.p2      52.000      20.000
+j2.p3                              54.500
+j3.p3      34.500      34.500      60.000
+
+
+
+EXECUTION TIME       =        6.859 SECONDS      3 Mb  WEX239-239 Nov  9, 2012
+
+
+USER: Dept. Biochemical Engineering                  S120223:1043AN-WIN
+      University College London                                  DC9439
+      License for teaching and research at degree granting institutions
+
+
+**** FILE SUMMARY
+
+Input      C:\Users\Karolis\Source\MILPModels\lakhdar2005\example2_modfied.gms
+Output     C:\Users\Karolis\Source\MILPModels\lakhdar2005\example2_modfied.lst

@@ -1,0 +1,204 @@
+
+--- Job example2_modfied.gms Start 08/05/18 20:56:27 WEX-WEI 23.9.5 x86_64/MS Windows     
+GAMS Rev 239  Copyright (C) 1987-2012 GAMS Development. All rights reserved
+Licensee: Dept. Biochemical Engineering                  S120223:1043AN-WIN
+          University College London                                  DC9439
+          License for teaching and research at degree granting institutions
+--- Starting compilation
+--- example2_modfied.gms(213) 3 Mb
+--- Starting execution: elapsed 0:00:00.018
+--- example2_modfied.gms(206) 4 Mb
+--- Generating MIP model lakhdar2005example2
+--- example2_modfied.gms(208) 4 Mb
+---   1,223 rows  1,097 columns  4,213 non-zeroes
+---   648 discrete-columns
+***
+***   180 Integer +INF Bounds have been reset to 100
+***
+--- Executing CPLEX: elapsed 0:00:00.118
+
+IBM ILOG CPLEX   Jul  4, 2012 23.9.5 WEX 36376.36401 WEI x86_64/MS Windows
+--- GAMS/Cplex licensed for continuous and discrete problems.
+Cplex 12.4.0.1
+
+Reading data...
+Starting Cplex...
+Tried aggregator 2 times.
+MIP Presolve eliminated 148 rows and 85 columns.
+MIP Presolve modified 274 coefficients.
+Aggregator did 66 substitutions.
+Reduced MIP has 1009 rows, 946 columns, and 3284 nonzeros.
+Reduced MIP has 452 binaries, 180 generals, 0 SOSs, and 0 indicators.
+Probing fixed 0 vars, tightened 21 bounds.
+Probing time =    0.00 sec.
+Tried aggregator 1 time.
+MIP Presolve eliminated 4 rows and 4 columns.
+MIP Presolve modified 77 coefficients.
+Reduced MIP has 1005 rows, 942 columns, and 3276 nonzeros.
+Reduced MIP has 448 binaries, 252 generals, 0 SOSs, and 0 indicators.
+Presolve time =    0.03 sec.
+Found feasible solution after 0.03 sec.  Objective = -5120.0000
+Probing time =    0.00 sec.
+Clique table members: 803.
+MIP emphasis: balance optimality and feasibility.
+MIP search method: dynamic search.
+Parallel mode: deterministic, using up to 4 threads.
+Tried aggregator 1 time.
+LP Presolve eliminated 19 rows and 0 columns.
+Aggregator did 16 substitutions.
+Reduced LP has 970 rows, 926 columns, and 3200 nonzeros.
+Presolve time =    0.00 sec.
+Initializing dual steep norms . . .
+
+Iteration log . . .
+Iteration:     1   Dual objective     =          2288.000000
+Iteration:   120   Dual objective     =           826.603276
+Iteration:   223   Dual objective     =           817.128584
+Iteration:   311   Dual objective     =           815.042955
+Iteration:   396   Dual objective     =           814.551426
+Initializing dual steep norms . . .
+Root relaxation solution time =    0.02 sec.
+
+        Nodes                                         Cuts/
+   Node  Left     Objective  IInf  Best Integer    Best Bound    ItCnt     Gap
+
+*     0+    0                        -5120.0000                    461     --- 
+      0     0      814.3317   220    -5120.0000      814.3317      461  115.90%
+      0     0      808.0253   242    -5120.0000     Cuts: 187      741  115.78%
+      0     0      781.8806   282    -5120.0000     Cuts: 110     1201  115.27%
+      0     0      769.7853   272    -5120.0000      Cuts: 87     1291  115.03%
+      0     0      766.5131   295    -5120.0000      Cuts: 35     1422  114.97%
+      0     0      764.7301   273    -5120.0000      Cuts: 65     1506  114.94%
+      0     0      762.1272   308    -5120.0000      Cuts: 48     1592  114.89%
+      0     0      762.1272   292    -5120.0000      Cuts: 57     1629  114.89%
+      0     0      762.1272   292    -5120.0000       Cuts: 8     1633  114.89%
+*     0+    0                           63.0000      762.1272     1633     --- 
+      0     2      762.1272   233       63.0000      762.1272     1633     --- 
+Elapsed real time =   0.44 sec. (tree size =  0.01 MB, solutions = 2)
+*    89+   89                           86.0000      752.8688     8196  775.43%
+*   190+  188                          294.0000      752.8687    10597  156.08%
+*   275   233      integral     0      413.0000      752.8687    11755   82.29%
+*   502+  349                          485.0000      752.5521    18840   55.17%
+                                                 Impl Bds: 10                  
+    771   476      494.3333    97      485.0000      742.4271    25507   53.08%
+                                                 Impl Bds: 12                  
+*   807+  500                          487.0000      742.4271    26251   52.45%
+*   843+  530                          489.0000      742.4271    26922   51.83%
+*   915+  564                          591.0000      739.9271    29043   25.20%
+                                                  Impl Bds: 8                  
+*  1012+  361                          595.0000      737.5938    32093   23.97%
+                                                  Impl Bds: 3                  
+   1256   482      639.5938   173      595.0000      720.4259    40207   21.08%
+                                                     Cuts: 22                  
+   1631   682      627.1873   247      595.0000      708.0534    57545   19.00%
+                                                     Cuts: 38                  
+   1995   882      640.7500   126      595.0000      699.4974    73878   17.56%
+                                                     Cuts: 17                  
+   2346  1055      736.0199   265      595.0000      695.7083    92055   16.93%
+   2353  1059      733.6536   245      595.0000      695.7083    93522   16.93%
+   2427  1081      667.9972   220      595.0000      695.7083    99148   16.93%
+   2738   917      646.3233   208      595.0000      695.7083   115861   16.93%
+                                                      Cuts: 5                  
+   3818   903      616.2000   214      595.0000      680.1538   191992   14.31%
+                                                     Cuts: 53                  
+Elapsed real time =   6.16 sec. (tree size =  1.80 MB, solutions = 11)
+   4745  1269      645.4352   222      595.0000      666.4333   268890   12.01%
+                                                     Cuts: 16                  
+*  5185+ 1416                          598.0000      663.8642   304770   11.01%
+                                                     Cuts: 34                  
+   5616  1500      612.5613   212      598.0000      659.9625   343224   10.36%
+                                                     Cuts: 21                  
+   6589  1630      613.0278   203      598.0000      651.3068   432320    8.91%
+                                                     Cuts: 30                  
+   7478  1669      608.3333   226      598.0000      644.1527   511628    7.72%
+                                                     Cuts: 47                  
+   8568  1559        cutoff            598.0000      635.5833   602712    6.28%
+                                                     Cuts: 32                  
+   9531  1258      621.5988   249      598.0000      627.8354   673872    4.99%
+                                                     Cuts: 11                  
+  11089   545      609.7324   253      598.0000      618.5000   761693    3.43%
+                                                     Cuts: 27                  
+
+GUB cover cuts applied:  5
+Clique cuts applied:  1
+Cover cuts applied:  131
+Implied bound cuts applied:  62
+Flow cuts applied:  98
+Mixed integer rounding cuts applied:  86
+Zero-half cuts applied:  4
+Gomory fractional cuts applied:  25
+
+Root node processing (before b&c):
+  Real time             =    0.41
+Parallel b&c, 4 threads:
+  Real time             =   18.48
+  Sync time (average)   =    0.00
+  Wait time (average)   =    0.00
+                          -------
+Total (root+branch&cut) =   18.89 sec.
+MIP status(101): integer optimal solution
+Fixing integer variables, and solving final LP...
+Tried aggregator 1 time.
+LP Presolve eliminated 1142 rows and 994 columns.
+Aggregator did 29 substitutions.
+Reduced LP has 52 rows, 74 columns, and 203 nonzeros.
+Presolve time =    0.00 sec.
+Initializing dual steep norms . . .
+
+Iteration log . . .
+Iteration:     1   Dual infeasibility =            95.999999
+Iteration:    12   Dual objective     =          3589.000000
+Fixed MIP status(1): optimal
+
+Proven optimal solution.
+
+MIP Solution:          598.000000    (780596 iterations, 11740 nodes)
+Final Solve:           598.000000    (24 iterations)
+
+Best possible:         598.000000
+Absolute gap:            0.000000
+Relative gap:            0.000000
+
+--- Restarting execution
+--- example2_modfied.gms(208) 2 Mb
+--- Reading solution for model lakhdar2005example2
+--- Executing after solve: elapsed 0:00:19.338
+--- example2_modfied.gms(213) 3 Mb
+
+GDXXRW           Jul  4, 2012 23.9.5 WIN 36376.36401 VS8 x86/MS Windows       
+Excel version 16.0
+Input file : C:\Users\Karolis\Source\MILPModels\lakhdar2005\results.gdx
+Output file: C:\Users\Karolis\Source\MILPModels\lakhdar2005\Lakhdar2005.xlsm
+Substituting Index
+var=CP Rng=CP!A4:AA100
+var=FP Rng=FP!A4:AA100
+var=S Rng=S!A4:AA100
+var=CI Rng=CI!A4:AA100
+var=FI Rng=FI!A4:AA100
+var=CW Rng=CW!A4:AA100
+var=FW Rng=FW!A4:AA100
+var=delta Rng=delta!A4:AA100
+var=Z Rng=Z!A4:AA100
+var=X Rng=X!A4:AA100
+var=Y Rng=Y!A4:AA100
+var=U Rng=U!A4:AA100
+var=CT Rng=CT!A4:AA100
+var=FT Rng=FT!A4:AA100
+Type Symbol       Dim     Sheet                Data          RowHeader     ColHeader     
+Var  CP             3     CP                   C5:AA100      A5:B100       C4:AA4        
+Var  FP             3     FP                   C5:AA100      A5:B100       C4:AA4        
+Var  S              2     S                    B5:AA100      A5:A100       B4:AA4        
+Var  CI             2     CI                   B5:AA100      A5:A100       B4:AA4        
+Var  FI             2     FI                   B5:AA100      A5:A100       B4:AA4        
+Var  CW             2     CW                   B5:AA100      A5:A100       B4:AA4        
+Var  FW             2     FW                   B5:AA100      A5:A100       B4:AA4        
+Var  delta          2     delta                B5:AA100      A5:A100       B4:AA4        
+Var  Z              3     Z                    C5:AA100      A5:B100       C4:AA4        
+Var  X              3     X                    C5:AA100      A5:B100       C4:AA4        
+Var  Y              3     Y                    C5:AA100      A5:B100       C4:AA4        
+Var  U              3     U                    C5:AA100      A5:B100       C4:AA4        
+Var  CT             3     CT                   C5:AA100      A5:B100       C4:AA4        
+Var  FT             3     FT                   C5:AA100      A5:B100       C4:AA4        
+Total time = 6688 Ms
+*** Status: Normal completion
+--- Job example2_modfied.gms Stop 08/05/18 20:56:53 elapsed 0:00:26.199

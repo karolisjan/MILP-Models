@@ -208,5 +208,5 @@ MODEL                    lakhdar2005example2 /All/;
 
 SOLVE                    lakhdar2005example2 USING MIP MAXIMIZING profit;
 
-DISPLAY profit.l, Sold.l, TC.l, PC.l, BC.l, SC.l, CC.l, WC.l;
+DISPLAY profit.l, Sold.l, TC.l, PC.l, BC.l, SC.l, CC.l, WC.l, delta.l;
 

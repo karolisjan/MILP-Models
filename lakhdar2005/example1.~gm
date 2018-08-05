@@ -196,7 +196,7 @@ FinalLimit(p, t)..             FI(p, t)        =L=     SUM(tt$(ORD(tt)>ORD(t) an
 del(p, t)..                    delta(p, t)     =E=     delta(p, t - 1)$(ORD(t) > 1) + Demand(p, t) - S(p, t);
 
 
-MODEL                    lakhdar2005example1 /All/;
+MODEL                    lakhdar2005 /All/;
 
                          option MIP = CPLEX;
                          option optcr = 0.0;
